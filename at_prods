@@ -1,0 +1,120 @@
+from datetime import datetime
+from numpy import append
+import pandas as pd
+import sys, os
+import pyodbc
+import requests
+from requests.models import ContentDecodingError
+import csv, json
+import time
+
+server = '192.168.1.15' 
+database = 'PROTHEUS_ZANOTTI_PRODUCAO' 
+username = 'totvs' 
+password = 'totvsip' 
+conn = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER='+server+';DATABASE='+database+';UID='+username+';PWD='+ password)
+cursor = conn.cursor()
+
+query_produtos="SELECT TRIM(SB1.B1_COD) AS SKU, TRIM(SB5.B5_ECTITU) AS TITULO, SB5.B5_ECDESCR AS DESCRIÇÃO, CASE WHEN SB1.B1_ZMKTPLC = 'S' THEN 'enable' WHEN SB1.B1_ZMKTPLC = 'N' THEN 'disable' ELSE '' END AS STATUS, ISNULL((SELECT SUM(B2_QATU - B2_RESERVA) FROM SB2010 WHERE D_E_L_E_T_ = '' AND B2_LOCAL = '01' AND B2_COD = SB1.B1_COD),0) AS SALDO, SB1.B1_CUSTD	AS CUSTO, SB1.B1_PESBRU	AS PESO, SB5.B5_ALTURA AS ALTURA, SB5.B5_LARG AS LARGURA, SB5.B5_COMPR AS COMPRIMENTO, TRIM(SA2.A2_NREDUZ) AS MARCA, TRIM(SB1.B1_CODBAR) AS CODBAR, TRIM(SB1.B1_POSIPI) AS NCM, ZB2.ZB2_CODFAM AS COD_CATEGORIA, ZB2.ZB2_DESFAM AS CATEGORIA, TRIM(SB5.B5_ECIMGFI) AS IMAGEM,'TENSAO' AS COD_SPEC, TRIM(SB1.B1_ZTENSAO) AS SPEC FROM SB1010 SB1 LEFT JOIN SB5010 SB5 ON SB5.D_E_L_E_T_ = '' AND SB5.B5_COD = SB1.B1_COD LEFT JOIN SA2010 SA2 ON SA2.D_E_L_E_T_ = '' AND SA2.A2_COD = SB1.B1_PROC AND SA2.A2_LOJA = SB1.B1_LOJPROC LEFT JOIN ZB2010 ZB2 ON ZB2.D_E_L_E_T_ = '' AND ZB2.ZB2_CODFAM = SB1.B1_ZCODFAM WHERE 1=1 AND SB1.D_E_L_E_T_ = '' AND SUBSTRING(SB1.B1_GRUPO,1,2) = 'MR' AND B1_ZMKTPLC='S'"
+df_produto=pd.read_sql(query_produtos,conn)
+print(df_produto)
+
+url = 'http://api.ideris.com.br/Login'
+payload= json.dumps({"login_token":"27efe191bb0f077c38fae0fe3970863c9ecee6017c60a79f430e58a598fa52e578f43a64b7fbdc230d5c599207607b3f"})
+headers= {"Content-Type": "application/json"}
+response = requests.request("POST", url, headers=headers, data=payload)
+response= str(response.text)
+response= response.replace('"',"",2)
+
+response3=[]
+
+url_produtos= "http://api.ideris.com.br/Produto/"
+headers = {
+  "Authorization":response,
+  "Content-Type": "application/json"
+}
+
+qtde_linhas = ((df_produto['SKU'].count())-1)
+print(qtde_linhas)
+atual_lin= 0
+limite_linha= 9
+thejson2= []
+#if limite_linha>qtde_linhas:
+#    qtde_linhas=limite_linha
+
+
+
+while(atual_lin<=limite_linha) and ((qtde_linhas>=limite_linha)or(qtde_linhas<9)):
+    while(atual_lin <= qtde_linhas)and(atual_lin<=limite_linha):
+        sku= str(df_produto.iloc[atual_lin, 0])
+        cost= (df_produto.iloc[atual_lin, 5])
+        cost= round(cost,2)
+        qty= int(df_produto.iloc[atual_lin,4])
+        qty=str(qty)
+        weight= df_produto.iloc[atual_lin,6]
+        height= df_produto.iloc[atual_lin,7]
+        width= df_produto.iloc[atual_lin,8]
+        length= df_produto.iloc[atual_lin,9]
+        height= height * 100
+        width= width * 100
+        length= length * 100
+        
+        if ((height * width * length/6000)>weight):
+            weight=float(height * width * length/6000)
+            
+        if (weight<=0.499):
+            price = ((cost+((cost*0.3))+32.90)/0.84)
+         
+        if (0.999 >= weight > 0.499):
+            price = ((cost+((cost*0.3))+ 35.90)/0.84)
+                        
+        if (1.999>=weight>1):
+            price = ((cost+((cost*0.3))+36.90)/0.84)
+        
+        if (4.999>=weight>2):
+            price = ((cost+((cost*0.3))+45.90)/0.84)
+        
+        if (8.999>=weight>5):
+            price = ((cost+((cost*0.3))+67.90)/0.84)
+       
+        if (12.999>=weight>9):
+            price = ((cost+((cost*0.3))+91.90)/0.84)
+       
+        if (16.999>=weight>1):
+            price = ((cost+((cost*0.3))+104.90)/0.84)
+      
+        if (22.999>=weight>17):
+            price = ((cost+((cost*0.3))+112.90)/0.84)
+             
+        if (28.999>=weight>=23):
+            price = ((cost+((cost*0.3))+119.90)/0.84)
+                 
+        if (weight>=29):
+            cost = float(cost)
+            price = ((cost+(cost*0.3)+50)/0.84)
+        
+        cost= round(cost)
+        cost=str(cost)
+        price = float(price)
+        price=round(price,2)
+        price= str(price)
+    
+        thejson1 = '{"sku":"'+sku+'","atualizarValoresMarketplace":"True","quantidadeEstoquePrincipal":"'+qty+'"}'
+        atual_lin = atual_lin + 1
+        thejson2 = str(thejson1)
+        print(thejson2)
+        payload_produtos = json.loads(thejson2)
+        response2= requests.request("PUT", url_produtos, headers=headers, json=payload_produtos) 
+        print(response2.text)
+        response3.append(response2.text)
+    
+    limite_linha = limite_linha + 10
+    time.sleep(60)
+arquivo = open('C:/Users/Thales.Bartolomeu/Desktop/MKTPLACE/json/atualizacoes_preco_estoque.txt', 'r+')
+texto = arquivo.readlines()
+data= str(datetime.now())
+texto.append(data)
+texto.append(response3)
+texto= str(texto)
+arquivo.writelines(texto)
+arquivo.close()
