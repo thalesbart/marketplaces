@@ -1,0 +1,138 @@
+import pandas as pd
+from pandas.core.frame import DataFrame
+import requests
+from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.chrome import options
+from selenium.webdriver.chrome.options import Options
+from time import sleep
+
+lista_produtos_americanas = []
+options = Options()
+options.add_argument('--headless')
+navegador = webdriver.Chrome('C:/Users/Thales.Bartolomeu/Desktop/MKTPLACE/chromedriver.exe')
+navegador.get('https://www.americanas.com.br/lojista/zanotti-refrigeracao')
+navegador.delete_all_cookies()
+
+produtos = navegador.find_elements_by_class_name('product-grid-item')
+
+for produto in produtos:
+    produto = produto.text
+    #lista_produtos_americanas.append([produto])
+    print(produto)
+
+produtos_precos_americanas = pd.DataFrame(lista_produtos_americanas, columns=['Produto'])
+print(produtos_precos_americanas)
+produtos_precos_americanas.to_excel('C:/Users/Thales.Bartolomeu/Desktop/MKTPLACE/Benchmark/americanas.xlsx')
+
+'''
+BENCHMARK MAGALU
+
+lista_produtos_magalu = []
+options = Options()
+options.add_argument('--headless')
+navegador = webdriver.Chrome('C:/Users/Thales.Bartolomeu/Desktop/MKTPLACE/chromedriver.exe')
+navegador.get('https://www.magazineluiza.com.br/')
+navegador.delete_all_cookies()
+
+input_product = navegador.find_element_by_tag_name('input')
+produto_buscado = 'espremedor de suco industrial'
+input_product.send_keys(produto_buscado)
+input_product.submit()
+pag_atual = navegador.page_source
+produtos = BeautifulSoup(pag_atual, 'html.parser')
+produtos = produtos.findAll('li', attrs={'class':'fMzYwK'})
+print(produtos)
+for produto in produtos:
+    
+    titulo = produto.find('h2', attrs={'class':'sc-erFXsz XsVUp'})
+    preco = produto.find('p', attrs={'class':'gLqQlk'})
+    
+    if (preco):
+        lista_produtos_magalu.append([titulo.text, preco.text])
+    else:
+        lista_produtos_magalu.append([titulo.text, ''])
+
+produtos_precos_magalu = pd.DataFrame(lista_produtos_magalu, columns=['Título','Preço'])
+print(produtos_precos_magalu)
+produtos_precos_magalu.to_excel('C:/Users/Thales.Bartolomeu/Desktop/MKTPLACE/Benchmark/'+produto_buscado+'.xlsx')
+
+
+Amazon
+lista_produtos_amazon = []
+
+response = requests.get('https://www.amazon.com.br/s?me=A3EFLXQFB9JH4I&marketplaceID=A2Q3Y263D00KWC')
+content = response.content
+
+ofertas_amazon_zanotti = BeautifulSoup(content, 'html.parser')
+produtos = ofertas_amazon_zanotti.findAll('div', attrs={'class':'s-result-item'})
+
+for produto in produtos:
+
+    preco = produto.find('span', attrs={'class':'a-price-whole'})
+    titulo = produto.find('span', attrs={'class':'a-text-normal'})
+
+    if (preco):
+        lista_produtos_amazon.append([titulo.text, preco.text])
+    #else:
+     #   lista_produtos.append([titulo.text, ''])
+
+produtos_precos_amazon = pd.DataFrame(lista_produtos_amazon, columns=['Título','Preço'])
+print(produtos_precos_amazon)
+
+"""
+lista_produtos_MM = []
+response_MM = requests.get('https://www.madeiramadeira.com.br/lojista/zanotti-refrigeracao?hitsPerPage=60')
+content_MM = response_MM.content
+
+ofertas_MM_zanotti = BeautifulSoup(content_MM, 'html.parser')
+produtos_MM = ofertas_MM_zanotti.findAll('div', attrs={'class':'hit__hover'})
+print(produtos_MM)
+
+for produto_MM in produtos_MM:
+
+    preco_MM = produto_MM.find('p', attrs={'class':'hit__price'})
+    titulo_MM = produto_MM.find('h3', attrs={'class':'hit__name'})
+
+    if (preco_MM):
+        lista_produtos_MM.append([titulo_MM.text, preco_MM.text])
+    else:
+        lista_produtos_MM.append([titulo_MM.text, ''])
+
+produtos_precos_MM = pd.DataFrame(lista_produtos_MM, columns=['Título','Preço'])
+
+MADEIRA MADEIRA
+
+lista_produtos_mm = []
+options = Options()
+options.add_argument('--headless')
+navegador = webdriver.Chrome('C:/Users/Thales.Bartolomeu/Desktop/MKTPLACE/chromedriver.exe')
+navegador.get('https://www.madeiramadeira.com.br/')
+navegador.delete_all_cookies()
+
+input_product_mm = navegador.find_element_by_tag_name('input')
+produto_buscado_mm = 'espremedor de suco industrial'
+input_product_mm.send_keys(produto_buscado_mm)
+input_product_mm.submit()
+sleep(3)
+pag_atual_mm = navegador.page_source
+produtos_mm = BeautifulSoup(pag_atual_mm, 'html.parser')
+print(pag_atual_mm)
+produtos_mm = produtos_mm.findAll('div', attrs={'class':'cav--c-gqwkJN'})
+#print(produtos_mm)
+
+
+for produto_mm in produtos_mm:
+    
+    titulo_mm = produto_mm.find('h2', attrs={'class':'cav--c-gNPphv'})
+    preco_mm = produto_mm.find('span', attrs={'class':'cav--c-gNPphv'})
+    
+    if (preco_mm):
+        lista_produtos_mm.append([titulo_mm.text, preco_mm.text])
+    else:
+        lista_produtos_mm.append([titulo_mm.text, ''])
+
+produtos_precos_mm = pd.DataFrame(lista_produtos_mm, columns=['Título','Preço'])
+print(produtos_precos_mm)
+produtos_precos_mm.to_excel('C:/Users/Thales.Bartolomeu/Desktop/MKTPLACE/Benchmark/'+produto_buscado_mm+'.xlsx')
+'''
