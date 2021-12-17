@@ -31,38 +31,7 @@ cursor = conn.cursor()
 x="S"
 happening =1
 erro = 0
-'''
-janela = Tk()
-janela.title("Simulação de Frete")
-janela.geometry('351x345+400+150')
-janela.resizable(width=0,height=0)
-cod_produto = tkinter.Label(janela, text="Sku", fg="black").place(x=8,y=10)
-#ent_sku=tkinter.Entry(fg="black",bg= "#eff0f1", width=10).place(x=10,y=30)
-label_valor = tkinter.Label(janela, text="Preço", fg="black").place(x=81,y=10)
-ent_valor=tkinter.Entry(fg="black",bg= "#eff0f1", width=20, ).place(x=83,y=30)
-label_cnpj = tkinter.Label(janela, text="CPF\CNPJ", fg="black").place(x=214,y=10)
-ent_cnpj=tkinter.Entry(fg="black",bg= "#eff0f1", width=20).place(x=216,y=30)
-label_cep = tkinter.Label(janela, text="CEP", fg="black").place(x=7,y=50)
-ent_cep=tkinter.Entry(fg="black",bg= "#eff0f1", width=10).place(x=10,y=70)
-label_cidade = tkinter.Label(janela, text="Cidade", fg="black").place(x=81,y=50)
-ent_cidade=tkinter.Entry(fg="black",bg= "#d4d4d4", width=30).place(x=83,y=70)
-label_data = tkinter.Label(janela, text="Data", fg="black").place(x=271,y=50)
-ent_data = tkinter.Entry(fg="black",bg= "#eff0f1", width=10).place(x=275,y=70)
-#botao_consulta =Button(janela, text="Consultar", fg="black", width=10).place(x=60,y=300)
-botao_novaconsulta =Button(janela, text="Nova", fg="black", width=10).place(x=200,y=300)
-resultado_consulta =  Listbox(bg="#eff0f1",width=55, fg="black").place(x=8, y=120)
 
-
-def clicar():
-   sku= ent_sku.get()
-   print("clique")
-
-botao_consulta =Button(janela, text="Consultar", fg="black", width=10, command=clicar()).place(x=60,y=300)
-ent_sku=tkinter.Entry(fg="black",bg= "#eff0f1", width=10).place(x=10,y=30)
-
-janela.mainloop()
-
-'''
 while x=="S":
     while erro == 0:
         sku= input("Digite o código do produto: ")
@@ -207,7 +176,6 @@ while x=="S":
     largura=float(largura)
     profundidade=float(profundidade)
 
-    
     """
     if (peso < 90) and (altura <= 2) and (largura<=2) and (profundidade<=2):
         peso = str(peso)
@@ -337,4 +305,3 @@ while x=="S":
     else:
        x="N"
        exit
-
