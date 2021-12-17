@@ -1,0 +1,217 @@
+from numpy import append
+import pandas as pd
+import sys, os
+import requests
+from requests.api import get
+from requests.models import ContentDecodingError
+import csv, json
+from pandas import json_normalize
+
+token = {'api_token': 'bfcd16dace990379a45036ab9fb32f48738e3aa2'}
+get_url_sumario = 'https://zanottirefrigeracao.pipedrive.com/api/v1/deals/summary'
+
+get_response_sumario = requests.get(get_url_sumario, params=token)
+get_content_sumario = json.loads(get_response_sumario.content)
+
+df_sumario = pd.DataFrame.from_dict(json_normalize(get_content_sumario), orient='columns')
+qtde_deals = int(df_sumario.iloc[0,21])
+limite = 600
+inicio_deals = (qtde_deals-limite)
+deals = pd.DataFrame()
+deals_tratados2 = pd.DataFrame()
+
+while inicio_deals <= qtde_deals:
+    inicio_deals = str(inicio_deals)
+    url_deals = 'https://zanottirefrigeracao.pipedrive.com/api/v1/deals/?start='+inicio_deals+'&limit=500'
+    get_response_deals = requests.get(url_deals, params=token)
+    get_content_deals = json.loads(get_response_deals.content)
+    df_deals = pd.DataFrame.from_dict(json_normalize(get_content_deals), orient='columns')
+    df_deals = df_deals.iloc[0,1]
+    df_deals = pd.DataFrame(df_deals)
+    inicio_deals = int(inicio_deals)
+    inicio_deals = inicio_deals + 500
+    deals = pd.concat([deals,df_deals])
+    deals.to_excel('C:/Users/Thales.Bartolomeu/Desktop/MKTPLACE/pipe2.xlsx')
+    
+deals_tratados = pd.DataFrame(columns=['Id Negócio','Criador','Proprietário','Título','Valor','Criação','Última Atualização','Status','Pipeline','Estágio Pipeline','Mudança Estágio','Qualificador','Projetista','Segmento','Data do Fechamento','Data do Ganho','Data da Perda','Razão da Perda','Objetivo','Endereço','Cep','Como entrou'])
+linha = 0
+
+projetistas = {'nome_projetista':['Leonardo Paião','Claudinei Junior','Murilo'],'cod_projetista':['802','803','804']}
+projetistas = pd.DataFrame(projetistas)
+
+qualificadores = {'nome_qualificador':['Márcia','Carolina','Jussara'],'cod_qualificador':['575','785','800']}
+qualificadores = pd.DataFrame(qualificadores)
+
+while linha <= (limite-1):    
+    id_deal = deals.iloc[linha,0]
+    criador_deal = (deals.iloc[linha,1])
+    criador_deal = pd.DataFrame.from_dict(json_normalize(criador_deal), orient='columns')
+    criador_deal = criador_deal.iloc[0,1]   
+    dono_deal = deals.iloc[linha,2]
+    dono_deal = pd.DataFrame.from_dict(json_normalize(dono_deal), orient='columns')
+    dono_deal = dono_deal.iloc[0,1]
+    titulo_deal = deals.iloc[linha,6]
+    valor_deal = deals.iloc[linha,7]
+    data_criacao_deal = deals.iloc[linha,9]
+    data_update = deals.iloc[linha,10]
+    status = deals.iloc[linha,14]
+    identificador = deals.iloc[linha,46]
+    
+    id_pipeline = str(deals.iloc[linha,24])
+    url_pipeline = 'https://zanottirefrigeracao.pipedrive.com/api/v1/pipelines/'+id_pipeline
+    get_response_pipeline = requests.get(url_pipeline, params=token)
+    get_content_pipeline = json.loads(get_response_pipeline.content)
+    df_pipeline = pd.DataFrame.from_dict(json_normalize(get_content_pipeline), orient='columns')
+    pipeline = df_pipeline.iloc[0,2]
+       
+    id_estagio_pipeline = str(deals.iloc[linha,5])
+    url_estagio_pipeline = 'https://zanottirefrigeracao.pipedrive.com/api/v1/stages/'+id_estagio_pipeline
+    get_response_estagio_pipeline = requests.get(url_estagio_pipeline, params=token)
+    get_content_estagio_pipeline = json.loads(get_response_estagio_pipeline.content)
+    df_estagio_pipeline = pd.DataFrame.from_dict(json_normalize(get_content_estagio_pipeline), orient='columns')
+    estagio_pipeline = df_estagio_pipeline.iloc[0,3]
+    data_mudanca_estagio = deals.iloc[linha,11]
+
+    cf_qualificador = deals.iloc[linha,96]
+
+    if cf_qualificador == '':
+        cf_qualificador = qualificadores.loc[qualificadores['cod_qualificador'] == cf_qualificador]
+        cf_qualificador = cf_qualificador.iloc[0,1]
+    
+    cf_projetista = deals.iloc[linha,99]
+    if cf_projetista == '' :
+        cf_projetista = projetistas.loc[projetistas['cod_projetistas'] == cf_projetista]
+        cf_projetista = cf_projetista.iloc[0,1]
+    
+    cf_segmento = deals.iloc[linha,105]
+
+    data_fechamento = deals.iloc[linha,23]
+    data_ganho = deals.iloc[linha,25]
+    data_perda = deals.iloc[linha,27]
+    razao_perda = deals.iloc[linha,21]
+    objetivo = deals.iloc[linha,46]
+    endereco = deals.iloc[linha,60]
+    cep = deals.iloc[linha,69]
+    como_entrou = deals.iloc[linha,97]
+
+    deals_tratados.loc[linha]= [id_deal, criador_deal, dono_deal, titulo_deal, valor_deal, data_criacao_deal, data_update, status, pipeline, estagio_pipeline, data_mudanca_estagio, cf_qualificador, cf_projetista, cf_segmento, data_fechamento, data_ganho, data_perda, razao_perda, objetivo, endereco, cep, como_entrou]
+    linha = linha + 1
+    
+    deals_tratados2 = pd.concat([deals_tratados])
+       
+deals_tratados2.to_excel('C:/Users/Thales.Bartolomeu/Desktop/MKTPLACE/pipe1.xlsx')
+print(deals_tratados2)
+
+qtde_id_deals = deals_tratados2['Id Negócio'].count()
+print("qtde id deals",qtde_id_deals)
+atividades = pd.DataFrame()
+lista_atividades = pd.DataFrame(columns=['Id Atividade','Criador Atividade','Tipo Atividade','Data da Criação','Data da Conclusão','Título Atividade','Id Deal', 'Atribuída'])
+lista_atividades_planilha = pd.DataFrame()
+
+get_url_usuarios ='https://zanottirefrigeracao.pipedrive.com/api/v1/users'
+get_response_usuarios = requests.get(get_url_usuarios, params=token)
+get_content_usuarios = json.loads(get_response_usuarios.content)
+
+df_usuarios = pd.DataFrame.from_dict(json_normalize(get_content_usuarios), orient='columns')
+df_usuarios = df_usuarios.iloc[0,1]
+df_usuarios = pd.DataFrame(df_usuarios, columns=['id','name'])
+
+linha = 0
+while linha <= (qtde_id_deals-1):
+    deal = int(deals_tratados2.iloc[linha,0])
+    deal = str(deal)
+    inicio_deals = int(inicio_deals)
+    inicio_deals = (qtde_deals-limite)
+    inicio_deals = str(inicio_deals)
+    url_atividades = 'https://zanottirefrigeracao.pipedrive.com/api/v1/deals/'+deal+'/activities'
+    #url_fluxo_atividades = 'https://zanottirefrigeracao.pipedrive.com/api/v1/deals/'+deal+'/flow'
+    inicio_deals = int(inicio_deals)
+    inicio_deals = inicio_deals + 500
+    get_response_activities = requests.get(url_atividades, params=token)
+    get_content_activities = json.loads(get_response_activities.content)
+    df_atividades = pd.DataFrame.from_dict(json_normalize(get_content_activities), orient='columns')
+    #get_response_fluxo_atividades = requests.get(url_fluxo_atividades, params=token)
+    #get_content_fluxo_atividades = json.loads(get_response_fluxo_atividades.content)
+    #df_fluxo_atividades = pd.DataFrame.from_dict(json_normalize(get_content_fluxo_atividades), orient='columns')
+
+    linha = linha + 1
+    #fluxo_atividades = pd.concat([fluxo_atividades, df_fluxo_atividades])
+    atividades = pd.concat([atividades,df_atividades])
+print("attiicaaa",atividades)
+
+
+qtde_atividades = atividades['success'].count()
+
+linha = 0
+loop = 1
+qtde_dados_atividades = 0
+linha_atividade = 0
+
+while linha <= (qtde_atividades - 1) and loop == 1:
+    
+    dados_atividades1 = atividades.iloc[linha,1]
+    dados_atividades = pd.DataFrame(dados_atividades1)
+    
+    if dados_atividades.empty:
+        loop = 0
+        
+    else:
+        loop = 1
+        
+        qtde_dados_atividades = dados_atividades['id'].count()
+        
+    linha_atividade1 = 0
+
+    while linha_atividade1 <= (qtde_dados_atividades - 1) and loop == 1:
+        
+        id_atividade = dados_atividades.iloc[linha_atividade1,0]
+        criador_atividade = dados_atividades.iloc[linha_atividade1,2]
+        criador_atividade = df_usuarios.loc[df_usuarios['id'] == criador_atividade]
+        criador_atividade=criador_atividade.iloc[0,1]
+        tipo_atividade = dados_atividades.iloc[linha_atividade1,4]
+        data_criacao = dados_atividades.iloc[linha_atividade1,9]
+        titulo_atividade = dados_atividades.iloc[linha_atividade1,18]
+        data_conclusao = dados_atividades.iloc[linha_atividade1,14]
+        deal_id = dados_atividades.iloc[linha_atividade1,24]
+        atividade_atribuida_a = dados_atividades.iloc[linha_atividade1,60]#atribuido a
+        atividade_atribuida_a = df_usuarios.loc[df_usuarios['id'] == atividade_atribuida_a]
+        atividade_atribuida_a = atividade_atribuida_a.iloc[0,1]
+
+        lista_atividades.loc[linha_atividade] = [id_atividade, criador_atividade, tipo_atividade, data_criacao, data_conclusao, titulo_atividade, deal_id, atividade_atribuida_a]
+        lista_atividades_planilha = pd.concat([lista_atividades])
+        linha_atividade = linha_atividade + 1
+        linha_atividade1 = linha_atividade1 + 1
+    print(lista_atividades_planilha)    
+
+
+'''
+ids_deal = deals_tratados2['Id Negócio']
+#ids_deal.to_excel('C:/Users/Thales.Bartolomeu/Desktop/MKTPLACE/pipe1.xlsx')
+
+url_all_fields = 'https://zanottirefrigeracao.pipedrive.com/api/v1/dealFields'
+get_response_fields = requests.get(url_all_fields, params=token)
+get_content_fields = json.loads(get_response_fields.content)
+df_fields = pd.DataFrame.from_dict(json_normalize(get_content_fields), orient='columns')
+df_fields = pd.DataFrame(df_fields.iloc[0,1])
+df_fields.to_excel('C:/Users/Thales.Bartolomeu/Desktop/MKTPLACE/all_deal_fields.xlsx')
+
+url_all_act_fields = 'https://zanottirefrigeracao.pipedrive.com/api/v1/activityFields'
+get_response_act_fields = requests.get(url_all_act_fields, params=token)
+get_content_act_fields = json.loads(get_response_act_fields.content)
+df_act_fields = pd.DataFrame.from_dict(json_normalize(get_content_act_fields), orient='columns')
+df_act_fields = pd.DataFrame(df_act_fields.iloc[0,1])
+df_act_fields.to_excel('C:/Users/Thales.Bartolomeu/Desktop/MKTPLACE/all_atividades_fields.xlsx')
+
+url_pipelines = 'https://zanottirefrigeracao.pipedrive.com/api/v1/pipelines'
+get_response_pipelines = requests.get(url_pipelines, params=token)
+get_content_pipelines = json.loads(get_response_pipelines.content)
+df_pipelines = pd.DataFrame.from_dict(json_normalize(get_content_pipelines), orient='columns')
+df_pipelines = pd.DataFrame(df_pipelines.iloc[0,1])
+df_pipelines.to_excel('C:/Users/Thales.Bartolomeu/Desktop/MKTPLACE/pipelines.xlsx')
+
+for deal in ids_deal:
+    inicio_deals = int(inicio_deals)
+    inicio_deals = (qtde_deals-limite)
+    url_atividades =  'https://zanottirefrigeracao.pipedrive.com/api/v1/deals/'+id_deal+'/?start='+inicio_deals+'&limit=500'
+    inicio_deals = inicio_deals + 500
+'''
