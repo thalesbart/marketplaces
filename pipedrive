@@ -31,7 +31,6 @@ while inicio_deals <= qtde_deals:
     inicio_deals = int(inicio_deals)
     inicio_deals = inicio_deals + 500
     deals = pd.concat([deals,df_deals])
-    deals.to_excel('C:/Users/Thales.Bartolomeu/Desktop/MKTPLACE/pipe2.xlsx')
     
 deals_tratados = pd.DataFrame(columns=['Id Negócio','Criador','Proprietário','Título','Valor','Criação','Última Atualização','Status','Pipeline','Estágio Pipeline','Mudança Estágio','Qualificador','Projetista','Segmento','Data do Fechamento','Data do Ganho','Data da Perda','Razão da Perda','Objetivo','Endereço','Cep','Como entrou'])
 linha = 0
@@ -99,7 +98,6 @@ while linha <= (limite-1):
     
     deals_tratados2 = pd.concat([deals_tratados])
        
-deals_tratados2.to_excel('C:/Users/Thales.Bartolomeu/Desktop/MKTPLACE/pipe1.xlsx')
 print(deals_tratados2)
 
 qtde_id_deals = deals_tratados2['Id Negócio'].count()
@@ -124,18 +122,13 @@ while linha <= (qtde_id_deals-1):
     inicio_deals = (qtde_deals-limite)
     inicio_deals = str(inicio_deals)
     url_atividades = 'https://zanottirefrigeracao.pipedrive.com/api/v1/deals/'+deal+'/activities'
-    #url_fluxo_atividades = 'https://zanottirefrigeracao.pipedrive.com/api/v1/deals/'+deal+'/flow'
     inicio_deals = int(inicio_deals)
     inicio_deals = inicio_deals + 500
     get_response_activities = requests.get(url_atividades, params=token)
     get_content_activities = json.loads(get_response_activities.content)
     df_atividades = pd.DataFrame.from_dict(json_normalize(get_content_activities), orient='columns')
-    #get_response_fluxo_atividades = requests.get(url_fluxo_atividades, params=token)
-    #get_content_fluxo_atividades = json.loads(get_response_fluxo_atividades.content)
-    #df_fluxo_atividades = pd.DataFrame.from_dict(json_normalize(get_content_fluxo_atividades), orient='columns')
-
+  
     linha = linha + 1
-    #fluxo_atividades = pd.concat([fluxo_atividades, df_fluxo_atividades])
     atividades = pd.concat([atividades,df_atividades])
 print("attiicaaa",atividades)
 
@@ -183,4 +176,4 @@ while linha <= (qtde_atividades - 1) and loop == 1:
         linha_atividade1 = linha_atividade1 + 1
     loop = 1
     linha = linha + 1
-    print(lista_atividades_planilha)    
+    print(lista_atividades_planilha)
