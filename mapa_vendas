@@ -1,0 +1,65 @@
+import folium
+import pandas as pd
+import numpy as np
+import requests
+
+vendas_mktplace = pd.read_sql('id_atendimento, valor do pedido, id_cliente, nome_cliente, forma de pagamento, transportadora')
+qtde_vendas = vendas_mktplace['id'].count()
+linha = 0
+mapa = folium.Map(location=[-21,-47], zoom_start=5)
+
+while linha <= qtde_vendas:
+    endereco = vendas_mktplace.iloc[linha,y]
+    url_coordenadas = 'https://maps.googleapis.com/maps/api/geocode/json?address='+endereco+'&key=YOUR_API_KEY'
+    get_response_coordenadas = requests.get(get_url_coordenadas)
+    get_content_coordenadas = json.loads(get_response_coordenadas.content)
+    coordenadas = pd.dataframe(get_content_coordenadas)
+    latitude = coordenadas.iloc[x,y]
+    longitude = coordenadas.iloc[x,y]
+    produto = vendas_mktplace.iloc[linha,y]
+    nome_cliente = vendas_mktplace.iloc[linha,y]
+    valor = vendas_mktplace.iloc[linha,y]
+    transportadora = vendas_mktplace[linha,y]
+    marketplace = vendas_mktplace[linha,y]
+    # pegar se foi expedido na api do pipefy
+    # pegar se foi entregue na api da transportadora (verificar como fazer no caso de expedicao pelo contrato do marketplace)
+    situacao = #escrever condicoes para determinar cada etapa da situação (pedido,faturado,separado,expedido,entregue, pago)
+    
+    if transportadora = 'rodonaves':
+        url_transportadora = "https://01wapi.rte.com.br/api/v1/"
+        header_transportadora =  {'Content-Type':'application/json'}
+        dados_requisicao_transportadora = '{"OriginZipCode": "06530075" ,"OriginCityId": 9560, "DestinationZipCode":"'+cepdestino+'","DestinationCityId":"'+IdCidade+'", "TotalWeight":"'+peso+'", "EletronicInvoiceValue":"'+valor+'", "CustomerTaxIdRegistration": "55963771000176", "Packs": [{"AmountPackages": 1,"Weight":"'+peso+'","Length":"'+profundidade+'","Height":"'+altura+'","Width":"'+largura+'"}]}'
+        response_transportadora = requests.request("GET", url_transportadora, headers=header_transportadora, data=data_cotacao)
+        response_transportadora = response_rte.text
+        json_entrega = "["+valor_rte+"]"
+        tabela_entrega = pd.read_json(valor_rte)
+        situacao_entrega = tabela_entrega.iloc[x,y]
+        data_entrega = tabela_entrega.iloc[x,y]
+        
+    if transportadora = 'correios':
+        url_transportadora = 'https://www.sgpweb.com.br/novo/api/consulta-precos-prazos?chave_integracao=ccfd6937b513db320221aac29b54f93c'
+        header_transportadora =  {'Content-Type':'application/json'}
+        dados_requisicao_transportadora = '{"OriginZipCode": "06530075" ,"OriginCityId": 9560, "DestinationZipCode":"'+cepdestino+'","DestinationCityId":"'+IdCidade+'", "TotalWeight":"'+peso+'", "EletronicInvoiceValue":"'+valor+'", "CustomerTaxIdRegistration": "55963771000176", "Packs": [{"AmountPackages": 1,"Weight":"'+peso+'","Length":"'+profundidade+'","Height":"'+altura+'","Width":"'+largura+'"}]}'
+        response_transportadora = requests.request("GET", url_transportadora, headers=headers, data=dados_requisicao_transportadora)
+        response_transportadora = response_rte.text
+        json_entrega = "["+response_transportadora+"]"
+        tabela_entrega = pd.read_json(json_entrega)
+        situacao_entrega = tabela_entrega.iloc[x,y]
+        data_entrega = tabela_entrega.iloc[x,y]
+          
+    if marketplace = 'americanas':
+        icone = #caminho do arquivo do respectivo marketplace no servidor
+    if marketplace = 'magalu':
+        icone = #caminho do arquivo do respectivo marketplace no servidor
+    
+    if situacao = 'pedido':
+        estagio = 'yellow'
+    if situacao = 'faturado':
+        estagio = 'blue'
+    if situacao = 'separado'
+        estagio = 'purple'
+    if situacao = 'expedido'
+        estagio = 'orange'
+    if situaco = 'pago'
+        estagio = 'green'
+    folium.Marker(location=[latitude, longitude], popup=[situacao, nome_cliente, produto, valor, transportadora, situacao_entrega, data_entrega], icon=folium.Icon(color=estagio, icon=icone)).add_to(m)
