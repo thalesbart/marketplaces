@@ -1,0 +1,114 @@
+import requests
+import pandas as pd
+import json
+import tkinter as tk
+from tkinter import *
+from tkinter import ttk 
+from tkinter import messagebox
+'''
+atendimento = "030622"
+url = "https://api.pipefy.com/graphql"
+id_card = '483214540'
+status_entrega_atual = '001'
+dt_acomp_entrega_atual = '002'
+ult_local_acomp_atual = '003'
+cod_rastreio = 'ass'
+payload = payaload_pipefy_atualiza_card = {"query":"mutation {moveCardToPhase(input:{card_id:"+id_card+",destination_phase_id:310139990}){card{id}}}"}
+headers = {
+    "Accept": "application/json",
+    "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJ1c2VyIjp7ImlkIjo5NjExMjYsImVtYWlsIjoibWFya2V0aW5nQHphbm90dGlyZWZyaWdlcmFjYW8uY29tLmJyIiwiYXBwbGljYXRpb24iOjMwMDEzNDkxM319.VIgfDCDN7Vb_HpBbBCqNi0cyoJT5AeDU_tT5OhZv6IBbkqRYTMYyfhFobu4d7KrSAYGRN7BKDlT2Ls_rO5ZK2A",
+    "Content-Type": "application/json"
+}
+
+response = requests.request("POST", url, json=payload, headers=headers)
+
+df = json.loads(response.content)
+
+df = pd.DataFrame(df)
+card = df.iloc[0,0]
+card = card['success']
+print(card)
+'''
+janela = tk.Tk()
+canvas = tk.Canvas(janela)
+janela.title("Marketplace")
+janela.geometry('700x550+300+100')
+janela.resizable(width=0,height=0)
+janela.iconphoto(False,tk.PhotoImage(file='//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Inserções Manuais/Imagens/icone.png'))
+
+abas = ttk.Notebook(janela)
+aba1 = Frame(abas)
+aba2 = Frame(abas)
+aba3 = Frame(abas)
+abas.add(aba1,text='Vendas')
+abas.add(aba2,text='Rastreio')
+abas.add(aba3,text='Ocorrências')
+
+abas.place(height=550, width=700,x=0, y=0)
+
+
+acompanhamento_pedidos = ttk.Treeview(aba1, selectmode="browse", column=('pedido','data_pedido','cod_produto','produto','quantidade','valor','frete','marketplace'),show ='headings')
+acompanhamento_pedidos.column('pedido',width=80, minwidth=50, stretch=NO)
+acompanhamento_pedidos.heading('#1', text='Pedido')
+acompanhamento_pedidos.column('data_pedido',width=90, minwidth=50, stretch=NO)
+acompanhamento_pedidos.heading('#2', text='Data Pedido')
+acompanhamento_pedidos.column('cod_produto',width=180, minwidth=50, stretch=NO)
+acompanhamento_pedidos.heading('#3', text=' Cód. Prod.')
+acompanhamento_pedidos.column('produto',width=180, minwidth=50, stretch=NO)
+acompanhamento_pedidos.heading('#4', text='Produto')
+acompanhamento_pedidos.column('quantidade',width=80, minwidth=50, stretch=NO)
+acompanhamento_pedidos.heading('#5', text='Qtde')
+acompanhamento_pedidos.column('valor',width=80, minwidth=50, stretch=NO)
+acompanhamento_pedidos.heading('#6', text='Valor')
+acompanhamento_pedidos.column('frete',width=80, minwidth=50, stretch=NO)
+acompanhamento_pedidos.heading('#7', text='Frete')
+acompanhamento_pedidos.column('marketplace',width=80, minwidth=50, stretch=NO)
+acompanhamento_pedidos.heading('#8', text='Marketplace')
+acompanhamento_pedidos.place(height=120, width=700,x=0, y=20)
+
+
+acompanhamento_atendimentos = ttk.Treeview(aba1, selectmode="browse", column=('atendimento','dt_atendimento','cliente','produto','valor','frete'),show ='headings')
+acompanhamento_atendimentos.column('atendimento',width=80, minwidth=50, stretch=NO)
+acompanhamento_atendimentos.heading('#1', text='Atendimento')
+acompanhamento_atendimentos.column('dt_atendimento',width=90, minwidth=50, stretch=NO)
+acompanhamento_atendimentos.heading('#2', text='Data Atend.')
+acompanhamento_atendimentos.column('cliente',width=180, minwidth=50, stretch=NO)
+acompanhamento_atendimentos.heading('#3', text='Cliente')
+acompanhamento_atendimentos.column('produto',width=180, minwidth=50, stretch=NO)
+acompanhamento_atendimentos.heading('#4', text='Produto')
+acompanhamento_atendimentos.column('valor',width=80, minwidth=50, stretch=NO)
+acompanhamento_atendimentos.heading('#5', text='Valor')
+acompanhamento_atendimentos.column('frete',width=80, minwidth=50, stretch=NO)
+acompanhamento_atendimentos.heading('#6', text='Frete')
+acompanhamento_atendimentos.place(height=120, width=700,x=0, y=160)
+
+
+acompanhamento_nfs = ttk.Treeview(aba1, selectmode="browse", column=('Cliente','NF','Data Emissão','Chave NF-e','Valor NF'),show ='headings')
+acompanhamento_nfs.column('Cliente',width=120, minwidth=50, stretch=NO)
+acompanhamento_nfs.heading('#1', text='Cliente')
+acompanhamento_nfs.column('NF',width=70, minwidth=50, stretch=NO)
+acompanhamento_nfs.heading('#2', text='NF')
+acompanhamento_nfs.column('Data Emissão',width=100, minwidth=50, stretch=NO)
+acompanhamento_nfs.heading('#3', text='Data Emissão')
+acompanhamento_nfs.column('Chave NF-e',width=300, minwidth=50, stretch=NO)
+acompanhamento_nfs.heading('#4', text='Chave NF-e')
+acompanhamento_nfs.column('Valor NF',width=100, minwidth=50, stretch=NO)
+acompanhamento_nfs.heading('#5', text='Valor NF')
+acompanhamento_nfs.place(height=120, width=700,x=0, y=300)
+
+label_nf = tk.Label(aba2, text="NF", fg="black").place(x=8,y=10)
+entrada_nf = tk.StringVar()
+ent_nf = tk.Entry(aba2,fg="black",bg= "#eff0f1", width=20,textvariable = entrada_nf).place(x=10,y=30)
+
+label_rastreio = tk.Label(aba2, text="Rastreio", fg="black").place(x=8,y=50)
+entrada_rastreio = tk.StringVar()
+ent_rastreio = tk.Entry(aba2, fg="black",bg= "#eff0f1", width=30, textvariable = entrada_rastreio).place(x=10,y=70)
+
+label_cod_mktplace = tk.Label(aba2, text="Código Marketplace", fg="black").place(x=8,y=90)
+entrada_cod_mktplace = tk.StringVar()
+ent_cod_mktplace = tk.Entry(aba2,fg="black",bg= "#eff0f1", width=30, textvariable = entrada_cod_mktplace).place(x=10,y=110)
+
+botao_ok = tk.Button(aba2, text='ok', width=10 ).place(x=15,y=140)
+botao_limpar = tk.Button(aba2, text='limpar', width=10 ).place(x=115,y=140)
+print('3')
+janela.mainloop()
