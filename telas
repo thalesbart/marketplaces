@@ -32,7 +32,7 @@ print(card)
 janela = tk.Tk()
 canvas = tk.Canvas(janela)
 janela.title("Marketplace")
-janela.geometry('700x550+300+100')
+janela.geometry('700x650+300+60')
 janela.resizable(width=0,height=0)
 janela.iconphoto(False,tk.PhotoImage(file='//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Inserções Manuais/Imagens/icone.png'))
 
@@ -44,27 +44,26 @@ abas.add(aba1,text='Vendas')
 abas.add(aba2,text='Rastreio')
 abas.add(aba3,text='Ocorrências')
 
-abas.place(height=550, width=700,x=0, y=0)
-
+abas.place(height=650, width=700,x=0, y=0)
 
 acompanhamento_pedidos = ttk.Treeview(aba1, selectmode="browse", column=('pedido','data_pedido','cod_produto','produto','quantidade','valor','frete','marketplace'),show ='headings')
 acompanhamento_pedidos.column('pedido',width=80, minwidth=50, stretch=NO)
 acompanhamento_pedidos.heading('#1', text='Pedido')
-acompanhamento_pedidos.column('data_pedido',width=90, minwidth=50, stretch=NO)
+acompanhamento_pedidos.column('data_pedido',width=80, minwidth=50, stretch=NO)
 acompanhamento_pedidos.heading('#2', text='Data Pedido')
-acompanhamento_pedidos.column('cod_produto',width=180, minwidth=50, stretch=NO)
-acompanhamento_pedidos.heading('#3', text=' Cód. Prod.')
-acompanhamento_pedidos.column('produto',width=180, minwidth=50, stretch=NO)
+acompanhamento_pedidos.column('cod_produto',width=60, minwidth=50, stretch=NO)
+acompanhamento_pedidos.heading('#3', text=' Cód.Prod')
+acompanhamento_pedidos.column('produto',width=170, minwidth=50, stretch=NO)
 acompanhamento_pedidos.heading('#4', text='Produto')
-acompanhamento_pedidos.column('quantidade',width=80, minwidth=50, stretch=NO)
+acompanhamento_pedidos.column('quantidade',width=40, minwidth=50, stretch=NO)
 acompanhamento_pedidos.heading('#5', text='Qtde')
 acompanhamento_pedidos.column('valor',width=80, minwidth=50, stretch=NO)
 acompanhamento_pedidos.heading('#6', text='Valor')
 acompanhamento_pedidos.column('frete',width=80, minwidth=50, stretch=NO)
 acompanhamento_pedidos.heading('#7', text='Frete')
-acompanhamento_pedidos.column('marketplace',width=80, minwidth=50, stretch=NO)
+acompanhamento_pedidos.column('marketplace',width=100, minwidth=50, stretch=NO)
 acompanhamento_pedidos.heading('#8', text='Marketplace')
-acompanhamento_pedidos.place(height=120, width=700,x=0, y=20)
+acompanhamento_pedidos.place(height=120, width=700,x=0, y=15)
 
 
 acompanhamento_atendimentos = ttk.Treeview(aba1, selectmode="browse", column=('atendimento','dt_atendimento','cliente','produto','valor','frete'),show ='headings')
@@ -80,7 +79,7 @@ acompanhamento_atendimentos.column('valor',width=80, minwidth=50, stretch=NO)
 acompanhamento_atendimentos.heading('#5', text='Valor')
 acompanhamento_atendimentos.column('frete',width=80, minwidth=50, stretch=NO)
 acompanhamento_atendimentos.heading('#6', text='Frete')
-acompanhamento_atendimentos.place(height=120, width=700,x=0, y=160)
+acompanhamento_atendimentos.place(height=120, width=700,x=0, y=155)
 
 
 acompanhamento_nfs = ttk.Treeview(aba1, selectmode="browse", column=('Cliente','NF','Data Emissão','Chave NF-e','Valor NF'),show ='headings')
@@ -94,7 +93,26 @@ acompanhamento_nfs.column('Chave NF-e',width=300, minwidth=50, stretch=NO)
 acompanhamento_nfs.heading('#4', text='Chave NF-e')
 acompanhamento_nfs.column('Valor NF',width=100, minwidth=50, stretch=NO)
 acompanhamento_nfs.heading('#5', text='Valor NF')
-acompanhamento_nfs.place(height=120, width=700,x=0, y=300)
+acompanhamento_nfs.place(height=120, width=700,x=0, y=295)
+
+acompanhamento_entregas = ttk.Treeview(aba1, selectmode="browse", column=('nf','fase_logi','transportadora','status_entrega','data_status'),show ='headings')
+acompanhamento_entregas.column('nf',width=120, minwidth=50, stretch=NO)
+acompanhamento_entregas.heading('#1', text='NF')
+acompanhamento_entregas.column('fase_logi',width=70, minwidth=50, stretch=NO)
+acompanhamento_entregas.heading('#2', text='Fase Logi')
+acompanhamento_entregas.column('transportadora',width=100, minwidth=50, stretch=NO)
+acompanhamento_entregas.heading('#3', text='Transp')
+acompanhamento_entregas.column('status_entrega',width=300, minwidth=50, stretch=NO)
+acompanhamento_entregas.heading('#4', text='Status')
+acompanhamento_entregas.column('data_status',width=100, minwidth=50, stretch=NO)
+acompanhamento_entregas.heading('#5', text='Data Status')
+acompanhamento_entregas.place(height=120, width=700,x=0, y=435)
+
+
+
+
+
+
 
 label_nf = tk.Label(aba2, text="NF", fg="black").place(x=8,y=10)
 entrada_nf = tk.StringVar()
