@@ -1,0 +1,97 @@
+import pandas as pd
+
+return imports()
+
+url_pedidos = "http://api.ideris.com.br/ListaPedido?dataInicial=" + data_atual2
+    headers_pedidos = {
+        "Authorization": response_ideris,
+        "Content-Type": "application/json"
+    }
+    response_pedidos = requests.request("GET", url_pedidos, headers=headers_pedidos)
+    response_pedidos = json.loads(response_pedidos.content)
+    pedidos = pd.DataFrame.from_dict(json_normalize(response_pedidos), orient='columns')
+    qtde_pedidos_periodo = pedidos.iloc[0,4]
+    pedidos = pedidos.iloc[0, 0]
+    pedidos = pd.DataFrame(pedidos)
+    novos_pedidos = pd.DataFrame()
+    novos_pedidos0 = pd.DataFrame(
+        columns=['id_pedido', 'cod_pedido', 'marketplace', 'status_pedido', 'data_pedido', 'valor_total_com_frete',
+                 'valor_total', 'tarifa_envio', 'tarifa_venda_marketplace', 'cod_entrega', 'tipo_entrega',
+                 'cod_rastreio', 'cliente', 'cpf_cnpj', 'telefone', 'email', 'endereco', 'cep', 'bairro', 'cidade',
+                 'estado', 'observacao', 'responsavel_receber', 'data_criacao', 'titulo_produto', 'sku', 'qtde',
+                 'preco_unitario', 'cod_pagamento', 'aprovacao_pagamento', 'status_pagamento', 'forma_pagamento',
+                 'parcelas'])
+    linha = 0
+
+    if pedidos.empty:
+        var_label_novos_pedidos.set('Nenhum pedido encontrado - última atualização em ' + data_atualizacao)
+    else:
+        var_label_novos_pedidos.set('Atualizando')
+        while linha <= (qtde_pedidos_periodo - 1):
+            id_pedido = str(pedidos.iloc[linha,0])
+            codigo_pedido = str(pedidos.iloc[linha,1])
+            marketplace = str(pedidos.iloc[linha,2])
+            status_pedido = pedidos.iloc[linha,7]
+            url_pedido = "http://api.ideris.com.br/Pedido/" + id_pedido
+            response_pedido = requests.request("GET", url_pedido, headers=headers_pedidos)
+            response_pedido = json.loads(response_pedido.content)
+            pedido = pd.DataFrame.from_dict(json_normalize(response_pedido), orient='columns')
+            pedido = pedido.iloc[0, 0]
+            pedido = pd.DataFrame(pedido)
+            data_pedido = str(pedido.iloc[0, 1])
+            return divisao_ddmmaa(data_pedido)
+            valor_total_com_frete = str(pedido.iloc[0,3])
+            valor_total_com_frete = valor_total_com_frete.replace('.',',')
+            valor_total_com_frete = "R$ " +valor_total_com_frete
+            valor_total = str(pedido.iloc[0,5])
+            valor_total = valor_total.replace('.',',')
+            valor_total = "R$ " + valor_total
+            tarifa_envio = str(pedido.iloc[0,6])
+            tarifa_envio = tarifa_envio.replace('.',',')
+            tarifa_envio = "R$ " + tarifa_envio
+            tarifa_venda_marketplace = pedido.iloc[0,7]
+            cod_entrega = pedido.iloc[0,23]
+            tipo_entrega = pedido.iloc[0,16]
+            cod_rastreio = pedido.iloc[0,25]
+            cliente = pedido.iloc[0,26]
+            cpf_cnpj = pedido.iloc[0,31]
+            telefone = pedido.iloc[0,33]
+            email = pedido.iloc[0,29]
+            endereco = pedido.iloc[0,34]
+            cep = pedido.iloc[0,37]
+            bairro = pedido.iloc[0,38]
+            cidade = pedido.iloc[0,39]
+            estado = pedido.iloc[0,0]
+            observacao = pedido.iloc[0,42]
+            responsavel_receber = pedido.iloc[0,43]
+            data_criacao = pedido.iloc[0,48]
+            itens = pedido.iloc[0,53]
+            itens = pd.DataFrame(itens)
+            titulo_produto = itens.iloc[0,0]
+            sku = itens.iloc[0,1]
+            qtde = itens.iloc[0,4]
+            preco_unitario = itens.iloc[0,5]
+            pagamento = pedido.iloc[0,54]
+            pagamento = pd.DataFrame(pagamento)
+            cod_pagamento = pagamento.iloc[0,0]
+            aprovacao_pagamento = pagamento.iloc[0,1]
+            ano_pag = aprovacao_pagamento[0:4]
+            mes_pag = aprovacao_pagamento[5:7]
+            dia_pag = aprovacao_pagamento[8:10]
+            aprovacao_pagamento = dia_pag + "/" + mes_pag + "/" + ano_pag
+            status_pagamento = pagamento.iloc[0,2]
+            forma_pagamento = pagamento.iloc[0,3]
+            parcelas = pagamento.iloc[0,4]
+            novos_pedidos0.loc[linha] = [id_pedido, codigo_pedido, marketplace, status_pedido, data_pedido,
+                                         valor_total_com_frete, valor_total, tarifa_envio, tarifa_venda_marketplace,
+                                         cod_entrega, tipo_entrega, cod_rastreio, cliente, cpf_cnpj, telefone, email,
+                                         endereco, cep, bairro, cidade, estado, observacao, responsavel_receber,
+                                         data_criacao, titulo_produto, sku, qtde, preco_unitario, cod_pagamento,
+                                         aprovacao_pagamento, status_pagamento, forma_pagamento, parcelas]
+
+            select_cliente = "select nome, cpf_cnpj from cadastro_cliente"
+            tabela_clientes = pd.read_sql(select_cliente,conn)
+            cpf_cnpjs = tabela_clientes['cpf_cnpj']
+
+            if cpf_cnpj not in cpf_cnpjs:
+                insert into cadastro_clientes (VENDEDOR, nome, cpf_cnpj, telefone, email, endereco, cep, bairro,cidade,estado, complemento,responsavel_receber, forma_pagamento,parcelas)values()
