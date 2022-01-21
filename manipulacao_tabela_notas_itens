@@ -1,0 +1,40 @@
+import pandas as pd
+import numpy
+import os,sys
+import tkinter
+caminho_tabela_entrada = '/home/thales/Documentos/Sem título 1.csv'
+
+tabela_entrada = pd.read_csv(caminho_tabela_entrada)
+print(tabela_entrada)
+colunas_input_table = tabela_entrada.columns.values
+qtde_linhas_oqi = tabela_entrada['tipo'].count()
+qtde_val_serem_preenchidos = tabela_entrada['valor'].dropna().count()
+tabela_saida = tabela_entrada
+linha_input_table = 0
+valor_itens = 0
+qtde_itens = 0
+cont_notas = 0
+
+while linha_input_table <= qtde_linhas_oqi:
+    nota_ou_item = tabela_entrada.iloc[linha_input_table,0]
+    valor = (tabela_entrada.iloc[linha_input_table,1])
+    descricao = tabela_entrada.iloc[linha_input_table,2]
+    if (nota_ou_item == 'nota') or (linha_input_table == qtde_linhas_oqi):
+         tabela_saida.loc[linha_input_table - qtde_itens,1] = [valor_itens]
+         linha_tipo_nota = linha_input_table
+         qtde_itens = 0
+         cont_notas = cont_notas + 1
+    if nota_ou_item == 'item' and valor == int:
+         valor = float
+         print(valor)
+         print(valor_itens)
+         valor_itens = valor_itens + valor
+         print(valor_itens)
+         qtde_itens = qtde_itens + 1
+    if (nota_ou_item !='nota') and (nota_ou_item != 'item'):
+        qtde_itens = qtde_itens + 1
+    linha_input_table = linha_input_table + 1
+
+print(tabela_saida)
+
+
