@@ -13,7 +13,7 @@ from pandas import json_normalize
 from datetime import date
 from datetime import datetime, timedelta
 import threading
-import string
+import time
 
 server = '192.168.1.15' 
 database = 'PROTHEUS_ZANOTTI_PRODUCAO' 
@@ -25,22 +25,31 @@ cursor = conn.cursor()
 df_cod_pedido = []
 df_cod_atendimento=[]
 def atualiza_pedidos():
+    print('aqui')
     url_ideris = 'http://api.ideris.com.br/Login'
     payload_ideris = json.dumps({"login_token":"27efe191bb0f077c38fae0fe3970863c9ecee6017c60a79f430e58a598fa52e578f43a64b7fbdc230d5c599207607b3f"})
     headers = {"Content-Type": "application/json"}
     response_ideris = requests.request("POST", url_ideris, headers=headers, data=payload_ideris)
     response_ideris = str(response_ideris.text)
 
+    select_ultimo_pedido = "SELECT MAX(DATA_PEDIDO) FROM ZMARKETPLACE_PEDIDOS"
+    data_ultimo_pedido = pd.read_sql(select_ultimo_pedido,conn)
+    data_ultimo_pedido = str(data_ultimo_pedido.iloc[0,0])
+    ano_ultimo_pedido = data_ultimo_pedido[0:4]
+    mes_ultimo_pedido = data_ultimo_pedido[4:6]
+    dia_ultimo_pedido = data_ultimo_pedido[6:8]
+    data_ultimo_pedido = ano_ultimo_pedido +"-"+mes_ultimo_pedido+"-"+dia_ultimo_pedido
+
     data_atual = date.today()
     data_atual3 = data_atual.strftime("%Y%m%d")
-    data_atual2=(date.today()+timedelta(days=-20))
+    data_atual2=(date.today())
     data_atual2 = data_atual2.strftime("%Y-%m-%d")
         
     data_atualizacao1 = datetime.today()
     data_atualizacao = data_atualizacao1.strftime("%d/%m/%Y %H:%M:%S")
     response_ideris = response_ideris.replace('"',"",2)
 
-    url_pedidos = "http://api.ideris.com.br/ListaPedido?dataInicial="+data_atual2
+    url_pedidos = "http://api.ideris.com.br/ListaPedido?dataInicial="+data_ultimo_pedido+"&dataFinal="+data_atual2
     headers_pedidos = {
     "Authorization": response_ideris,
     "Content-Type": "application/json"
@@ -49,10 +58,8 @@ def atualiza_pedidos():
     response_pedidos = json.loads(response_pedidos.content)
     pedidos = pd.DataFrame.from_dict(json_normalize(response_pedidos), orient='columns')
     qtde_pedidos_periodo = pedidos.iloc[0,4]
-    print(qtde_pedidos_periodo)
     pedidos = pedidos.iloc[0,0]
     pedidos = pd.DataFrame(pedidos)
-    print(pedidos)
     novos_pedidos = pd.DataFrame()
     novos_pedidos0 = pd.DataFrame(columns=['id_pedido','cod_pedido','marketplace','status_pedido','data_pedido','valor_total_com_frete','valor_total','tarifa_envio','tarifa_venda_marketplace','cod_entrega','tipo_entrega','cod_rastreio','cliente','cpf_cnpj','telefone','email','endereco','cep','bairro','cidade','estado','observacao','responsavel_receber','data_criacao','titulo_produto','sku','qtde','preco_unitario','cod_pagamento','aprovacao_pagamento','status_pagamento','forma_pagamento','parcelas'])
     linha = 0
@@ -70,10 +77,8 @@ def atualiza_pedidos():
             url_pedido = "http://api.ideris.com.br/Pedido/"+id_pedido
             response_pedido = requests.request("GET", url_pedido, headers=headers_pedidos)
             response_pedido = json.loads(response_pedido.content)
-            print(response_pedido)
             pedido = pd.DataFrame.from_dict(json_normalize(response_pedido), orient='columns')          
             pedido = pedido.iloc[0,0]
-            print(pedido)
             pedido = pd.DataFrame(pedido)
             data_pedido = str(pedido.iloc[0,1])
             ano = data_pedido[0:4]
@@ -123,28 +128,24 @@ def atualiza_pedidos():
             forma_pagamento = pagamento.iloc[0,3]
             parcelas = pagamento.iloc[0,4]
             novos_pedidos0.loc[linha] = [id_pedido,codigo_pedido,marketplace,status_pedido,data_pedido,valor_total_com_frete,valor_total,tarifa_envio,tarifa_venda_marketplace,cod_entrega,tipo_entrega,cod_rastreio,cliente,cpf_cnpj,telefone,email,endereco,cep,bairro,cidade,estado,observacao,responsavel_receber,data_criacao,titulo_produto,sku,qtde,preco_unitario,cod_pagamento,aprovacao_pagamento,status_pagamento,forma_pagamento,parcelas]
-            
+            verifica_pedido = 0           
             if str(codigo_pedido) not in df_cod_pedido:
+                verifica_pedido = 1
                 novos_pedidos = pd.concat([novos_pedidos0])
                 tree_acompanhamento_pedidos = novos_pedidos[['cod_pedido','aprovacao_pagamento','sku','titulo_produto','qtde', 'valor_total', 'tarifa_envio','marketplace']]
-                linhas_pedidos = tree_acompanhamento_pedidos.to_numpy().tolist()
+                linhas_pedidos = tree_acompanhamento_pedidos.to_numpy().tolist() 
+                df_cod_pedido.append(codigo_pedido)           
 
-                for row in linhas_pedidos:
-                    acompanhamento_pedidos.insert('','end',values=row)
-            
-                df_cod_pedido.append(codigo_pedido)
-
-            consulta_pedido = "SELECT ID_PEDIDO, COD_PEDIDO FROM ZMARKETPLACE_PEDIDOS"
+            consulta_pedido = "SELECT ID_PEDIDO, COD_PEDIDO, DATA_PEDIDO FROM ZMARKETPLACE_PEDIDOS"
             consulta_pedido = pd.read_sql(consulta_pedido,conn)
             consulta_pedido = consulta_pedido['ID_PEDIDO'].tolist()
-
-            if codigo_pedido not in consulta_pedido:
-                insert_pedido = "INSERT INTO ZMARKETPLACE_PEDIDOS (ID_PEDIDO,COD_PEDIDO,MARKETPLACE) VALUES ('"+id_pedido+"','"+codigo_pedido+"','"+marketplace+"')"
+        
+            if id_pedido not in consulta_pedido:
+                insert_pedido = "INSERT INTO ZMARKETPLACE_PEDIDOS (ID_PEDIDO,COD_PEDIDO,MARKETPLACE, DATA_PEDIDO) VALUES ('"+id_pedido+"','"+codigo_pedido+"','"+marketplace+"','"+data_pedido+"')"
                 cursor.execute(insert_pedido)
                 conn.commit()
-
             
-            atendimentos_mktplaces_query = "SELECT SUA.UA_NUM AS Atendimento, SUA.UA_EMISSAO AS Data_Atendimento, SUA.UA_DESPESA AS Frete,(SUA.UA_ENTRADA - SUA.UA_DESPESA) AS Valor_Venda, SUA.UA_CLIENTE AS Cod_Cliente, SA1.A1_NOME AS Cliente,TRIM(SA1.A1_CGC) AS CPF_CNPJ,SA1.A1_EST AS Estado,TRIM(SA1.A1_MUN) AS Municipio, SUB.UB_PRODUTO AS Cod_Produto, SUB.UB_ZDESC AS Produto,ZB2.ZB2_DESFAM AS Categoria, SUB.UB_OPER AS Operacao, SUA.UA_VEND AS Cod_Vendedor, SA4.A4_NOME AS Transportadora,SE1.E1_NOMCLI AS Marketplace FROM SUA010 SUA  LEFT JOIN SL1010 SL1 ON SL1.D_E_L_E_T_ = '' AND SL1.L1_FILIAL = SUA.UA_FILIAL AND SL1.L1_NUMATEN = SUA.UA_NUM LEFT JOIN SA1010 SA1 ON SA1.D_E_L_E_T_ = '' AND SA1.A1_COD = SUA.UA_CLIENTE LEFT JOIN SL4010 SL4 ON SL4.D_E_L_E_T_ = '' AND SL4.L4_DOC = SL1.L1_DOC  LEFT JOIN SF2010 SF2 ON SF2.D_E_L_E_T_ = '' AND SF2.F2_DOC = SL1.L1_DOC  LEFT JOIN SUB010 SUB ON SUB.D_E_L_E_T_ = '' AND SUB.UB_NUM = SUA.UA_NUM LEFT JOIN SL2010 SL2 ON SL2.D_E_L_E_T_ = '' AND SL2.L2_DOC = SL1.L1_DOC  LEFT JOIN SE1010 SE1 ON SE1.D_E_L_E_T_ = '' AND SE1.E1_NUM = SL1.L1_DOC  LEFT JOIN SAE010 SAE ON SAE.D_E_L_E_T_ = '' AND SAE.AE_COD = SE1.E1_CLIENTE  LEFT JOIN SA4010 SA4 ON SA4.D_E_L_E_T_ = '' AND SA4.A4_COD = SUA.UA_TRANSP LEFT JOIN SB1010 SB1 ON SB1.D_E_L_E_T_ = '' AND SB1.B1_COD = SUB.UB_PRODUTO LEFT JOIN SB5010 SB5 ON SB5.D_E_L_E_T_ = '' AND SB5.B5_COD = SB1.B1_COD LEFT JOIN ZB2010 ZB2 ON ZB2.D_E_L_E_T_ = '' AND ZB2.ZB2_CODFAM = SB1.B1_ZCODFAM LEFT JOIN ZMARKETPLACE MKT ON MKT.NF = SL2.L2_DOC WHERE 1=1 AND SUA.D_E_L_E_T_ = '' AND SUA.UA_VEND = '000099' AND SUA.UA_EMISSAO >= '"+(data_atual3)+"' AND SA1.A1_CGC ='"+cpf_cnpj+"' GROUP BY SUA.UA_FILIAL, SUA.UA_NUM,SUA.UA_EMISSAO,SUA.UA_CLIENTE,SA1.A1_NOME,SA1.A1_CGC,SA1.A1_EST, SA1.A1_MUN,SUB.UB_PRODUTO,SB5.B5_CODFAM,SUB.UB_ZDESC, ZB2.ZB2_CODFAM, ZB2.ZB2_DESFAM,SUB.UB_OPER,SUA.UA_VEND,SA4.A4_NOME,SUA.UA_TRANSP,SE1.E1_NOMCLI, SUA.UA_DESPESA, SUA.UA_ENTRADA"
+            atendimentos_mktplaces_query = "SELECT SUA.UA_NUM AS Atendimento, SUA.UA_EMISSAO AS Data_Atendimento, SUA.UA_DESPESA AS Frete,(SUA.UA_ENTRADA - SUA.UA_DESPESA) AS Valor_Venda, SUA.UA_CLIENTE AS Cod_Cliente, SA1.A1_NOME AS Cliente,TRIM(SA1.A1_CGC) AS CPF_CNPJ,SA1.A1_EST AS Estado,TRIM(SA1.A1_MUN) AS Municipio, SUB.UB_PRODUTO AS Cod_Produto, SUB.UB_ZDESC AS Produto,ZB2.ZB2_DESFAM AS Categoria, SUB.UB_OPER AS Operacao, SUA.UA_VEND AS Cod_Vendedor, SA4.A4_NOME AS Transportadora,SE1.E1_NOMCLI AS Marketplace FROM SUA010 SUA  LEFT JOIN SL1010 SL1 ON SL1.D_E_L_E_T_ = '' AND SL1.L1_FILIAL = SUA.UA_FILIAL AND SL1.L1_NUMATEN = SUA.UA_NUM LEFT JOIN SA1010 SA1 ON SA1.D_E_L_E_T_ = '' AND SA1.A1_COD = SUA.UA_CLIENTE LEFT JOIN SL4010 SL4 ON SL4.D_E_L_E_T_ = '' AND SL4.L4_DOC = SL1.L1_DOC  LEFT JOIN SF2010 SF2 ON SF2.D_E_L_E_T_ = '' AND SF2.F2_DOC = SL1.L1_DOC  LEFT JOIN SUB010 SUB ON SUB.D_E_L_E_T_ = '' AND SUB.UB_NUM = SUA.UA_NUM LEFT JOIN SL2010 SL2 ON SL2.D_E_L_E_T_ = '' AND SL2.L2_DOC = SL1.L1_DOC  LEFT JOIN SE1010 SE1 ON SE1.D_E_L_E_T_ = '' AND SE1.E1_NUM = SL1.L1_DOC  LEFT JOIN SAE010 SAE ON SAE.D_E_L_E_T_ = '' AND SAE.AE_COD = SE1.E1_CLIENTE  LEFT JOIN SA4010 SA4 ON SA4.D_E_L_E_T_ = '' AND SA4.A4_COD = SUA.UA_TRANSP LEFT JOIN SB1010 SB1 ON SB1.D_E_L_E_T_ = '' AND SB1.B1_COD = SUB.UB_PRODUTO LEFT JOIN SB5010 SB5 ON SB5.D_E_L_E_T_ = '' AND SB5.B5_COD = SB1.B1_COD LEFT JOIN ZB2010 ZB2 ON ZB2.D_E_L_E_T_ = '' AND ZB2.ZB2_CODFAM = SB1.B1_ZCODFAM LEFT JOIN ZMARKETPLACE MKT ON MKT.NF = SL2.L2_DOC WHERE 1=1 AND SUA.D_E_L_E_T_ = '' AND SUA.UA_VEND = '000099' AND SUA.UA_EMISSAO <= '"+data_atual3+"'AND SUA.UA_EMISSAO >='"+data_pedido+"'  AND SA1.A1_CGC ='"+cpf_cnpj+"' GROUP BY SUA.UA_FILIAL, SUA.UA_NUM,SUA.UA_EMISSAO,SUA.UA_CLIENTE,SA1.A1_NOME,SA1.A1_CGC,SA1.A1_EST, SA1.A1_MUN,SUB.UB_PRODUTO,SB5.B5_CODFAM,SUB.UB_ZDESC, ZB2.ZB2_CODFAM, ZB2.ZB2_DESFAM,SUB.UB_OPER,SUA.UA_VEND,SA4.A4_NOME,SUA.UA_TRANSP,SE1.E1_NOMCLI, SUA.UA_DESPESA, SUA.UA_ENTRADA"
             atendimentos_mktplaces_in = pd.read_sql(atendimentos_mktplaces_query,conn)
             
             qtde_linhas_atendimentos_mktplaces = atendimentos_mktplaces_in['Atendimento'].count()
@@ -156,12 +157,10 @@ def atualiza_pedidos():
             while linha_atendimentos_mktplaces <= (qtde_linhas_atendimentos_mktplaces-1):
                 atendimento_atd = atendimentos_mktplaces_in.iloc[linha_atendimentos_mktplaces,0]
                 data_atd = atendimentos_mktplaces_in.iloc[linha_atendimentos_mktplaces,1]
-
                 ano_atd = data_atd[0:4]
                 mes_atd = data_atd[4:6]
                 dia_atd = data_atd[6:8]
                 data_atd = dia_atd+"/"+mes_atd+"/"+ano_atd
-
                 cliente_atd = str(atendimentos_mktplaces_in.iloc[linha_atendimentos_mktplaces,5]).replace('.',',').title()
                 produto_atd = str(atendimentos_mktplaces_in.iloc[linha_atendimentos_mktplaces,10]).replace('.',',').title()
                 valor_venda_atd = round((atendimentos_mktplaces_in.iloc[linha_atendimentos_mktplaces,3]),2)
@@ -169,21 +168,31 @@ def atualiza_pedidos():
                 frete_atd = round((atendimentos_mktplaces_in.iloc[linha_atendimentos_mktplaces,2]),2)
                 frete_atd = "R$ "+ str(frete_atd)
                 atendimentos_mktplaces1.loc[linha_atendimentos_mktplaces] = [atendimento_atd,data_atd,cliente_atd,produto_atd,valor_venda_atd, frete_atd]
-                
+                verifica_atendimento = 0
+
                 if str(atendimento_atd) not in df_cod_atendimento:
+                    verifica_atendimento = 1    
                     atendimentos_mktplaces = pd.concat([atendimentos_mktplaces1])
                     linhas_atendimentos = atendimentos_mktplaces.to_numpy().tolist()
+                df_cod_atendimento.append(atendimento_atd)
 
-                    for row in linhas_atendimentos:
-                        acompanhamento_atendimentos.insert('','end',values=row)
-
-                    df_cod_atendimento.append(atendimento_atd)
                 linha_atendimentos_mktplaces = linha_atendimentos_mktplaces + 1
+
             linha = linha + 1
-            if linha == 9:
-                sleep(60)
+
+            if (linha == 9) or (linha == 19) or (linha == 28) or (linha == 37) or (linha == 46) or (linha == 55):
+                time.sleep(60)
+    
             var_label_novos_pedidos.set('Pedidos atualizados - última atualização em '+ data_atualizacao)
-    t = threading.Timer(60.0, atualiza_pedidos)
+        
+        if verifica_pedido == 1:
+            for row in linhas_pedidos:
+                acompanhamento_pedidos.insert('','end',values=row)
+        if verifica_atendimento == 1:
+            for row in linhas_atendimentos:
+                acompanhamento_atendimentos.insert('','end',values=row)
+
+    t = threading.Timer(10.0, atualiza_pedidos)
     t.start()
 
 janela = tk.Tk()
@@ -312,7 +321,7 @@ ent_descricao_ocor = tk.Entry(aba3,fg="black",bg= "#eff0f1", width=80).place(x=1
 botao_ok_ocor = tk.Button(aba3, text='ok', width=10, command=inserir_ocorrencia ).place(x=15,y=300)
 botao_limpar_ocor = tk.Button(aba3, text='limpar', width=10 ).place(x=115,y=300)
 
-t = threading.Timer(1.0, atualiza_pedidos)
+t = threading.Timer(5.0, atualiza_pedidos)
 t.start()
 
 janela.mainloop()
