@@ -1,40 +1,73 @@
+from tkinter import messagebox
+from tkinter.constants import BOTTOM
+from numpy.core.fromnumeric import var
 import pandas as pd
 import numpy
 import os,sys
-import tkinter
-caminho_tabela_entrada = '/home/thales/Documentos/Sem título 1.csv'
+import tkinter as tk
+from tkinter import *
+from tkinter import Text, filedialog
 
-tabela_entrada = pd.read_csv(caminho_tabela_entrada)
-print(tabela_entrada)
-colunas_input_table = tabela_entrada.columns.values
-qtde_linhas_oqi = tabela_entrada['tipo'].count()
-qtde_val_serem_preenchidos = tabela_entrada['valor'].dropna().count()
-tabela_saida = tabela_entrada
-linha_input_table = 0
-valor_itens = 0
-qtde_itens = 0
-cont_notas = 0
+def altera_tabela():
+    try:
+        tabela_entrada = pd.read_excel(entrada_tabela_entrada.get())
+        colunas_input_table = tabela_entrada.columns.values
+        qtde_linhas_oqi = tabela_entrada['tipo'].count()
+        qtde_val_serem_preenchidos = tabela_entrada['valor'].dropna().count()
+        tabela_saida = tabela_entrada
+        linha_input_table = 0
+        valor_itens = 0
+        qtde_itens = 0
+        cont_notas = 0
 
-while linha_input_table <= qtde_linhas_oqi:
-    nota_ou_item = tabela_entrada.iloc[linha_input_table,0]
-    valor = (tabela_entrada.iloc[linha_input_table,1])
-    descricao = tabela_entrada.iloc[linha_input_table,2]
-    if (nota_ou_item == 'nota') or (linha_input_table == qtde_linhas_oqi):
-         tabela_saida.loc[linha_input_table - qtde_itens,1] = [valor_itens]
-         linha_tipo_nota = linha_input_table
-         qtde_itens = 0
-         cont_notas = cont_notas + 1
-    if nota_ou_item == 'item' and valor == int:
-         valor = float
-         print(valor)
-         print(valor_itens)
-         valor_itens = valor_itens + valor
-         print(valor_itens)
-         qtde_itens = qtde_itens + 1
-    if (nota_ou_item !='nota') and (nota_ou_item != 'item'):
-        qtde_itens = qtde_itens + 1
-    linha_input_table = linha_input_table + 1
+        while linha_input_table <= (qtde_linhas_oqi - 1):
+            nota_ou_item = tabela_entrada.iloc[linha_input_table,0]
+            valor = (tabela_entrada.iloc[linha_input_table,1])
+            
+            if  linha_input_table == (qtde_linhas_oqi-1):
+                if "item" in nota_ou_item:
+                    valor_itens = valor_itens + valor
+                    tabela_saida.loc[linha_input_table - qtde_itens,['valor']] = [valor_itens]
+                    nota_ou_item = 'fim'
+                else:
+                    qtde_itens = qtde_itens + 1
 
-print(tabela_saida)
+            if 'nota' in nota_ou_item :
+                tabela_saida.loc[linha_input_table - qtde_itens,['valor']] = [valor_itens]
+                linha_tipo_nota = linha_input_table
+                qtde_itens = 0
+                qtde_itens = qtde_itens + 1
+                valor_itens = 0
 
+            if 'item' in nota_ou_item:
+                valor_itens = valor_itens + valor
+                qtde_itens = qtde_itens + 1
 
+            if (nota_ou_item !='nota') and (nota_ou_item != 'item'):
+                qtde_itens = qtde_itens + 1
+
+            linha_input_table = linha_input_table + 1
+        tabela_saida.to_excel(entrada_tabela_entrada.get(),index=False)
+        messagebox.showinfo('Pronto!','Tabela transformada com sucesso')
+        entrada_tabela_entrada.set('Nenhum caminho apontado')
+    except:
+        messagebox.showinfo('Erro!','Algo deu errado. Verifique o arquivo e tente novamente.')
+        entrada_tabela_entrada.set('Nenhum caminho apontado')
+
+def abrir_arquivo():
+    filename = filedialog.askopenfilename()
+    entrada_tabela_entrada.set(filename)
+    
+janela = tk.Tk()
+canvas = tk.Canvas(janela)
+janela.title("Soma itens")
+janela.geometry('250x100+600+300')
+janela.resizable(width=0,height=0)
+filename = 'Nenhum caminho selecionado'
+label_tabela_entrada = tk.Label(janela, fg="black", text = 'Caminho da Tabela').place(x=8,y=10)
+entrada_tabela_entrada = tk.StringVar()
+text_tabela_entrada = tk.Entry(janela,fg="black",bg= "#eff0f1", width=30, textvariable=entrada_tabela_entrada).place(x=8,y=32)
+entrada_tabela_entrada.set('Nenhum caminho apontado')
+button = tk.Button(janela, text='Abrir', command = abrir_arquivo, height=1).place(x=200,y=28)
+botao_ok = tk.Button(janela, text='Transformar', width=10, command= altera_tabela).place(x=80,y=60)
+janela.mainloop()
