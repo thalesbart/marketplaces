@@ -8,7 +8,9 @@ import pyodbc
 import tkinter as tk
 from tkinter import *
 from tkinter import ttk 
+from tkinter import WORD
 from tkinter import messagebox
+from tkinter import scrolledtext
 from pandas import json_normalize
 from datetime import date
 from datetime import datetime, timedelta
@@ -24,6 +26,7 @@ cursor = conn.cursor()
 
 df_cod_pedido = []
 df_cod_atendimento=[]
+
 def atualiza_pedidos():
     print('aqui')
     url_ideris = 'http://api.ideris.com.br/Login'
@@ -206,9 +209,11 @@ abas = ttk.Notebook(janela)
 aba1 = Frame(abas)
 aba2 = Frame(abas)
 aba3 = Frame(abas)
+aba4 = Frame(abas)
 abas.add(aba1,text='Vendas')
 abas.add(aba2,text='Rastreio')
 abas.add(aba3,text='Ocorrências')
+abas.add(aba4,text='Frete')
 
 abas.place(height=650, width=700,x=0, y=0)
 
@@ -275,26 +280,13 @@ acompanhamento_entregas.place(height=120, width=700,x=0, y=435)
 var_label_novos_pedidos = StringVar()
 label_novos_pedidos = tk.Label(aba1, textvariable=var_label_novos_pedidos).place(x=8,y=600)
 
-label_nf = tk.Label(aba2, text="NF", fg="black").place(x=8,y=10)
-entrada_nf = tk.StringVar()
-ent_nf = tk.Entry(aba2,fg="black",bg= "#eff0f1", width=20,textvariable = entrada_nf).place(x=10,y=30)
-
-label_rastreio = tk.Label(aba2, text="Rastreio", fg="black").place(x=8,y=50)
-entrada_rastreio = tk.StringVar()
-ent_rastreio = tk.Entry(aba2, fg="black",bg= "#eff0f1", width=30, textvariable = entrada_rastreio).place(x=10,y=70)
-
-label_cod_mktplace = tk.Label(aba2, text="Código Marketplace", fg="black").place(x=8,y=90)
-entrada_cod_mktplace = tk.StringVar()
-ent_cod_mktplace = tk.Entry(aba2,fg="black",bg= "#eff0f1", width=30, textvariable = entrada_cod_mktplace).place(x=10,y=110)
-
-botao_ok = tk.Button(aba2, text='ok', width=10 ).place(x=15,y=140)
-botao_limpar = tk.Button(aba2, text='limpar', width=10 ).place(x=115,y=140)
+###ocorrencias###
 
 def inserir_ocorrencia():
     entrada_atendimento_ocor2 = str(entrada_atendimento_ocor.get())
     entrada_tipo_ocor2 = str(entrada_tipo_ocor.get())
-    entrada_descricao_ocor2 = str(entrada_descricao_ocor.get('1.0','end'))
-
+    entrada_descricao_ocor.get()
+    
     ok_cancelar = messagebox.askokcancel("Atenção", "Você deseja mesmo inserir as informações?")
     
     query_inserir_ocorrencia = "INSERT INTO ZMARKETPLACE_OCORRENCIAS (ATENDIMENTO, TIPO_OCORRENCIA, DESCRICAO_OCORRENCIA) VALUES('"+entrada_atendimento_ocor2+"','"+entrada_tipo_ocor2+"','"+entrada_descricao_ocor2+"')"
@@ -305,23 +297,238 @@ def inserir_ocorrencia():
     entrada_tipo_ocor.set('')
     entrada_descricao_ocor.set('')
 
-
 label_atendimento_ocor = tk.Label(aba3, text="Atendimento", fg="black").place(x=18,y=10)
 entrada_atendimento_ocor = tk.StringVar()
-ent_atendimento_ocor = tk.Entry(aba3,fg="black",bg= "#eff0f1", width=20,textvariable = entrada_atendimento_ocor).place(x=18,y=30)
+ent_atendimento_ocor = tk.Entry(aba3,fg="black", width=20,textvariable = entrada_atendimento_ocor).place(x=18,y=30)
 
 label_tipo_ocor = tk.Label(aba3, text="Tipo da Ocorrência", fg="black").place(x=188,y=10)
 entrada_tipo_ocor = tk.StringVar()
 ent_tipo_ocor = ttk.Combobox(aba3,values=['Mau estado - Sem NF','Mau estado','Faltando peça','Modelo errado enviado','Medidas erradas','Danificado pela transportadora','Erro de variação','Comprou errado','Arrependimento'],textvariable = entrada_tipo_ocor,width=25).place(x=188,y=30)
 
 label_descricao_ocor = tk.Label(aba3, text="Descrição da ocorrência", fg="black").place(x=18,y=50)
-entrada_descricao_ocor = tk.StringVar()
-ent_descricao_ocor = tk.Entry(aba3,fg="black",bg= "#eff0f1", width=80).place(x=18,y=70, height=150)
+entrada_descricao_ocor = StringVar()
+ent_descricao_ocor = tk.Entry(aba3,fg="black", width=100).place(x=18,y=70)
 
-botao_ok_ocor = tk.Button(aba3, text='ok', width=10, command=inserir_ocorrencia ).place(x=15,y=300)
-botao_limpar_ocor = tk.Button(aba3, text='limpar', width=10 ).place(x=115,y=300)
+botao_ok_ocor = tk.Button(aba3, text='Criar Ocorrência', width=12, command=inserir_ocorrencia ).place(x=200,y=100)
+botao_limpar_ocor = tk.Button(aba3, text='Limpar', width=12 ).place(x=300,y=100)
 
-t = threading.Timer(5.0, atualiza_pedidos)
+acompanhamento_ocorrencias = ttk.Treeview(aba3, selectmode="browse", column=('nf','produto','cliente','data_ult_acompanhamento','tipo_ocorrencia'),show ='headings')
+acompanhamento_ocorrencias.column('nf',width=90, minwidth=50, stretch=NO)
+acompanhamento_ocorrencias.heading('#1', text='NF')
+acompanhamento_ocorrencias.column('produto',width=200, minwidth=50, stretch=NO)
+acompanhamento_ocorrencias.heading('#2', text='Produto')
+acompanhamento_ocorrencias.column('cliente',width=200, minwidth=50, stretch=NO)
+acompanhamento_ocorrencias.heading('#3', text='Cliente')
+acompanhamento_ocorrencias.column('data_ult_acompanhamento',width=100, minwidth=50, stretch=NO)
+acompanhamento_ocorrencias.heading('#4', text='Data Entrega')
+acompanhamento_ocorrencias.column('tipo_ocorrencia',width=110, minwidth=50, stretch=NO)
+acompanhamento_ocorrencias.heading('#5', text='Ocorrência')
+acompanhamento_ocorrencias.place(height=200, width=700,x=0, y=140)
+
+lbl_atd_ocor = tk.Label(aba3, text="Atendimento", fg="black").place(x=10,y=340)
+var_atd_ocor = StringVar()
+txt_atd_ocor = tk.Entry(aba3, bg= "#eff0f1", textvariable = var_atd_ocor, width = 15, state=DISABLED).place(x=10,y=360)
+
+lbl_nf_ocor = tk.Label(aba3, text="Nota Fiscal", fg="black").place(x=120,y=340)
+var_nf_ocor = StringVar()
+txt_nf_ocor = tk.Entry(aba3, bg= "#eff0f1", textvariable = var_nf_ocor, width = 15, state=DISABLED).place(x=120,y=360)
+
+lbl_emissao_nf_ocor = tk.Label(aba3, text="Data Emissão NF", fg="black").place(x=220,y=340)
+var_emissao_nf_ocor = StringVar()
+txt_emissao_nf_ocor = tk.Entry(aba3, bg= "#eff0f1", textvariable = var_emissao_nf_ocor, width = 15, state=DISABLED).place(x=220,y=360)
+
+lbl_valor_nf_ocor = tk.Label(aba3, text="Valor NF", fg="black").place(x=320,y=340)
+var_valor_nf_ocor = StringVar()
+txt_valor_nf_ocor = tk.Entry(aba3, bg= "#eff0f1", textvariable = var_valor_nf_ocor, width = 15, state=DISABLED).place(x=320,y=360)
+
+lbl_cod_cliente_ocor = tk.Label(aba3, text="Cod.Cliente", fg="black").place(x=10,y=380)
+var_cod_cliente_ocor = StringVar()
+txt_cod_cliente_ocor = tk.Entry(aba3, bg= "#eff0f1", textvariable = var_cod_cliente_ocor, width = 15, state=DISABLED).place(x=10,y=400) 
+
+lbl_cliente_ocor = tk.Label(aba3, text="Cliente", fg="black").place(x=120,y=380)
+var_cliente_ocor = StringVar()
+txt_cliente_ocor = tk.Entry(aba3, bg= "#eff0f1", textvariable = var_cliente_ocor, width = 50, state=DISABLED).place(x=120,y=400)
+
+lbl_cod_prod_ocor = tk.Label(aba3, text="Cod.Produto", fg="black").place(x=10,y=420)
+var_cod_prod_ocor = StringVar()
+txt_cod_prod_ocor = tk.Entry(aba3, bg= "#eff0f1", textvariable = var_cod_prod_ocor, width = 15, state=DISABLED).place(x=10,y=440)
+
+lbl_produto_ocor = tk.Label(aba3, text="Produto", fg="black").place(x=120,y=420)
+var_produto_ocor = StringVar()
+txt_produto_ocor = tk.Entry(aba3, bg= "#eff0f1", textvariable = var_produto_ocor, width = 50, state=DISABLED).place(x=120,y=440)
+
+lbl_marketplace_ocor = tk.Label(aba3, text="Marketplace", fg="black").place(x=10,y=460)
+var_marketplace_ocor = StringVar()
+txt_marketplace_ocor = tk.Entry(aba3, bg= "#eff0f1", textvariable = var_marketplace_ocor, width = 30, state =DISABLED).place(x=10,y=480)
+
+lbl_transportadora_ocor = tk.Label(aba3, text="Transportadora", fg="black").place(x=210,y=460)
+var_transportadora_ocor = StringVar()
+txt_transportadora_ocor = tk.Entry(aba3, bg= "#eff0f1", textvariable = var_transportadora_ocor, width = 35, state=DISABLED).place(x=210,y=480)
+
+lbl_status_sac_ocor = tk.Label(aba3, text="Status da Ocorrência", fg="black").place(x=10,y=500)
+var_status_sac_ocor = StringVar()
+txt_status_sac_ocor = tk.Entry(aba3, bg= "#eff0f1", textvariable = var_status_sac_ocor, width = 20, state=DISABLED).place(x=10,y=520)
+
+lbl_atualizacao_atd = tk.Label(aba3, text = "Atualização da Ocorrência", bg= "#eff0f1").place(x=150,y=500)
+var_atualizacao_ocor = StringVar()
+txt_atualizacao_atd = scrolledtext.ScrolledText(aba3, bg= "#eff0f1", state=DISABLED).place( x=150, y=520, height=60, width=300)
+
+var_label_ocorrencias = StringVar()
+label_atualizacao_ocorrencias = tk.Label(aba3, text='Programar_atualização').place(x=8,y=600)
+
+###Rastreio###
+
+label_nf_rastreio = tk.Label(aba2, text="Nota Fiscal", fg="black").place(x=10,y=10)
+entrada_nf_rastreio = tk.StringVar()
+ent_nf_rastreio = tk.Entry(aba2,fg="black", width=15, textvariable = entrada_nf_rastreio).place(x=10,y=30)
+
+label_cod_rastreio = tk.Label(aba2, text="Rastreio", fg="black").place(x = 110,y=10)
+entrada_cod_rastreio = tk.StringVar()
+ent_cod_rastreio = tk.Entry(aba2, fg="black", width=25, textvariable = entrada_cod_rastreio).place(x=110,y=30)
+
+label_pedido_rastreio = tk.Label(aba2, text="Pedido", fg="black").place(x=270,y=10)
+entrada_pedido_rastreio = tk.StringVar()
+ent_pedido_rastreio = tk.Entry(aba2,fg="black", width=25, textvariable = entrada_pedido_rastreio).place(x=270,y=30)
+
+botao_ok_rastreio = tk.Button(aba2, text='Inserir', width=10 ).place(x=100, y=60)
+botao_limpar_rastreio = tk.Button(aba2, text='Limpar', width=10 ).place(x=210, y=60)
+
+acompanhamento_rastreios = ttk.Treeview(aba2, selectmode="browse", column=('nf','cod_produto','produto','cliente','data_expedicao','transportadora'),show ='headings')
+acompanhamento_rastreios.column('nf',width=80, minwidth=50, stretch=NO)
+acompanhamento_rastreios.heading('#1', text='NF')
+acompanhamento_rastreios.column('cod_produto',width=80, minwidth=50, stretch=NO)
+acompanhamento_rastreios.heading('#2', text='Cod.Produto')
+acompanhamento_rastreios.column('produto',width=160, minwidth=50, stretch=NO)
+acompanhamento_rastreios.heading('#3', text='Produto')
+acompanhamento_rastreios.column('cliente',width=160, minwidth=50, stretch=NO)
+acompanhamento_rastreios.heading('#4', text='Cliente')
+acompanhamento_rastreios.column('data_expedicao',width=90, minwidth=50, stretch=NO)
+acompanhamento_rastreios.heading('#5', text='Data Expedição')
+acompanhamento_rastreios.column('transportadora',width=120, minwidth=50, stretch=NO)
+acompanhamento_rastreios.heading('#6', text='Transportadora')
+acompanhamento_rastreios.place(height=200, width=700,x=0, y=100)
+
+lbl_atd_rastreio = tk.Label(aba2, text="Atendimento", fg="black").place(x=10,y=300)
+var_atd_rastreio = StringVar()
+txt_atd_rastreio = tk.Entry(aba2, bg= "#eff0f1", textvariable = var_atd_rastreio, width = 15, state=DISABLED).place(x=10,y=320)
+
+lbl_nf_rastreio = tk.Label(aba2, text="Nota Fiscal", fg="black").place(x=120,y=300)
+var_nf_rastreio = StringVar()
+txt_nf_rastreio = tk.Entry(aba2, bg= "#eff0f1", textvariable = var_nf_rastreio, width = 15, state=DISABLED).place(x=120,y=320)
+
+lbl_emissao_nf_rastreio = tk.Label(aba2, text="Data Emissão NF", fg="black").place(x=220,y=300)
+var_emissao_nf_rastreio = StringVar()
+txt_emissao_nf_rastreio = tk.Entry(aba2, bg= "#eff0f1", textvariable = var_emissao_nf_rastreio, width = 15, state=DISABLED).place(x=220,y=320)
+
+lbl_valor_nf_rastreio = tk.Label(aba2, text="Valor NF", fg="black").place(x=320,y=300)
+var_valor_nf_rastreio = StringVar()
+txt_valor_nf_rastreio = tk.Entry(aba2, bg= "#eff0f1", textvariable = var_valor_nf_rastreio, width = 15, state=DISABLED).place(x=320,y=320)
+
+lbl_cod_cliente_rastreio = tk.Label(aba2, text="Cod.Cliente", fg="black").place(x=10,y=340)
+var_cod_cliente_rastreio = StringVar()
+txt_cod_cliente_rastreio = tk.Entry(aba2, bg= "#eff0f1", textvariable = var_cod_cliente_rastreio, width = 15, state=DISABLED).place(x=10,y=360) 
+
+lbl_cliente_rastreio = tk.Label(aba2, text="Cliente", fg="black").place(x=120,y=340)
+var_cliente_rastreio = StringVar()
+txt_cliente_rastreio = tk.Entry(aba2, bg= "#eff0f1", textvariable = var_cliente_rastreio, width = 50, state=DISABLED).place(x=120,y=360)
+
+lbl_cod_prod_rastreio = tk.Label(aba2, text="Cod.Produto", fg="black").place(x=10,y=380)
+var_cod_prod_rastreio = StringVar()
+txt_cod_prod_rastreio = tk.Entry(aba2, bg= "#eff0f1", textvariable = var_cod_prod_rastreio, width = 15, state=DISABLED).place(x=10,y=400)
+
+lbl_produto_rastreio = tk.Label(aba2, text="Produto", fg="black").place(x=120,y=380)
+var_produto_rastreio = StringVar()
+txt_produto_rastreio = tk.Entry(aba2, bg= "#eff0f1", textvariable = var_produto_rastreio, width = 50, state=DISABLED).place(x=120,y=400)
+
+lbl_marketplace_rastreio = tk.Label(aba2, text="Marketplace", fg="black").place(x=10,y=420)
+var_marketplace_rastreio = StringVar()
+txt_marketplace_rastreio = tk.Entry(aba2, bg= "#eff0f1", textvariable = var_marketplace_rastreio, width = 30, state =DISABLED).place(x=10,y=440)
+
+lbl_transportadora_rastreio = tk.Label(aba2, text="Transportadora", fg="black").place(x=210,y=420)
+var_transportadora_rastreio = StringVar()
+txt_transportadora_rastreio = tk.Entry(aba2, bg= "#eff0f1", textvariable = var_transportadora_rastreio, width = 35, state=DISABLED).place(x=210,y=440)
+
+lbl_pedido_rastreio = tk.Label(aba2, text="Cod.Pedido", fg="black").place(x=10,y=460)
+var_pedido_rastreio = StringVar()
+txt_pedido_rastreio = tk.Entry(aba2, bg= "#eff0f1", textvariable = var_pedido_rastreio, width = 20, state=DISABLED).place(x=10,y=480)
+
+lbl_status_entrega_rastreio = tk.Label(aba2, text = "Status Entrega", bg= "#eff0f1").place(x=150,y=460)
+var_status_entrega_rastreio = StringVar()
+txt_status_entrega_rastreio = tk.Entry(aba2, bg= "#eff0f1", state=DISABLED, width= 45).place( x=150, y=480)
+
+lbl_ult_acomp_rastreio = tk.Label(aba2, text="Data Acompanhamento", fg="black").place(x=10,y=500)
+var_ult_acomp_rastreio = StringVar()
+txt_ult_acomp_rastreio = tk.Entry(aba2, bg= "#eff0f1", textvariable = var_ult_acomp_rastreio, width = 20, state=DISABLED).place(x=10,y=520)
+
+lbl_local_ultimo_acomp_rastreio = tk.Label(aba2, text = "Local Acompanhamento", bg= "#eff0f1").place(x=150,y=500)
+var_local_ultimo_acomp_rastreio = StringVar()
+txt_local_ultimo_acomp_rastreio = tk.Entry(aba2, bg= "#eff0f1", state=DISABLED, width= 45).place( x=150, y=520)
+
+var_label_rastreios = StringVar()
+label_atualizacao_rastreios = tk.Label(aba2, text='Programar_atualização').place(x=8,y=600)
+
+###Frete###
+
+label_cod_prod_cf = tk.Label(aba4, text="Cod.Produto", fg="black").place(x=10,y=10)
+entrada_cod_prod_cf = tk.StringVar()
+ent_cod_prod_cf = tk.Entry(aba4,fg="black", width=15, textvariable = entrada_cod_prod_cf).place(x=10,y=30)
+
+label_cpf_cnpj_cf = tk.Label(aba4, text="CPF/CNPJ", fg="black").place(x = 110,y=10)
+entrada_cpf_cnpj_cf = tk.StringVar()
+entrada_cpf_cnpj_cf = tk.Entry(aba4, fg="black", width=25, textvariable = entrada_cpf_cnpj_cf).place(x=110,y=30)
+
+label_cep_cf = tk.Label(aba4, text="CEP", fg="black").place(x=270,y=10)
+entrada_cep_cf = tk.StringVar()
+ent_cep_cf = tk.Entry(aba4,fg="black", width=20, textvariable = entrada_cep_cf).place(x=270,y=30)
+
+label_valor_nf_cf = tk.Label(aba4, text="Valor da NF", fg="black").place(x=400,y=10)
+entrada_valor_nf_cf = tk.StringVar()
+ent_valor_nf_cf = tk.Entry(aba4,fg="black", width = 20, textvariable = entrada_valor_nf_cf).place(x=400,y=30)
+
+botao_ok_cf = tk.Button(aba4, text='Consultar', width=10 ).place(x=160, y=60)
+botao_limpar_cf = tk.Button(aba4, text='Limpar', width=10 ).place(x=280, y=60)
+
+lbl_cod_prod_cf = tk.Label(aba4, text="Cod.Produto", fg="black").place(x=10,y=90)
+var_cod_prod_cf = StringVar()
+txt_cod_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_cod_prod_cf, width = 10, state=DISABLED).place(x=10,y=110)
+
+lbl_produto_cf = tk.Label(aba4, text="Produto", fg="black").place(x=110,y=90)
+var_produto_cf = StringVar()
+txt_produto_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_produto_cf, width = 50, state=DISABLED).place(x=110,y=110)
+
+lbl_alt_prod_cf = tk.Label(aba4, text="Altura", fg="black").place(x=10,y=130)
+var_alt_prod_cf = StringVar()
+txt_alt_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_alt_prod_cf, width = 10, state=DISABLED).place(x=10,y=150)
+
+lbl_larg_prod_cf = tk.Label(aba4, text="Largura", fg="black").place(x=100,y=130)
+var_larg_prod_cf = StringVar()
+txt_larg_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_larg_prod_cf, width = 10, state=DISABLED).place(x=100,y=150)
+
+lbl_prof_prod_cf = tk.Label(aba4, text="Profundidade", fg="black").place(x=180,y=130)
+var_prof_prod_cf = StringVar()
+txt_prof_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_prof_prod_cf, width = 10, state=DISABLED).place(x=180,y=150) 
+
+lbl_peso_bruto_prod_cf = tk.Label(aba4, text="Peso Bruto", fg="black").place(x=260,y=130)
+var_peso_bruto_prod_cf = StringVar()
+txt_peso_bruto_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_peso_bruto_prod_cf, width = 10, state=DISABLED).place(x=260,y=150)
+
+lbl_stk_prod_cf = tk.Label(aba4, text="Estoque disponível", fg="black").place(x=10,y=380)
+var_stk_prod_cf = StringVar()
+txt_stk_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_stk_prod_cf, width = 15, state=DISABLED).place(x=10,y=400)
+
+acompanhamento_cf = ttk.Treeview(aba4, selectmode="browse", column=('Transportadora','Preço','Prazo'),show ='headings')
+acompanhamento_cf.column('Transportadora',width=140, minwidth=50, stretch=NO)
+acompanhamento_cf.heading('#1', text='Transportadora')
+acompanhamento_cf.column('Preço',width=100, minwidth=50, stretch=NO)
+acompanhamento_cf.heading('#2', text='Preço')
+acompanhamento_cf.column('Prazo',width=100, minwidth=50, stretch=NO)
+acompanhamento_cf.heading('#3', text='Prazo')
+acompanhamento_cf.place(height=200, width=600,x=30, y=250)
+
+var_label_consulta_frete = StringVar()
+label_atualizacao_consulta_frete = tk.Label(aba4, text='Programar_atualização').place(x=8,y=600)
+
+t = threading.Timer(1.0, atualiza_pedidos)
 t.start()
 
 janela.mainloop()
