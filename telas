@@ -26,9 +26,11 @@ cursor = conn.cursor()
 
 df_cod_pedido = []
 df_cod_atendimento=[]
+df_nf_nfs=[]
+verifica_atendimento = 0
+verifica_pedido = 0
 
 def atualiza_pedidos():
-    print('aqui')
     url_ideris = 'http://api.ideris.com.br/Login'
     payload_ideris = json.dumps({"login_token":"27efe191bb0f077c38fae0fe3970863c9ecee6017c60a79f430e58a598fa52e578f43a64b7fbdc230d5c599207607b3f"})
     headers = {"Content-Type": "application/json"}
@@ -37,11 +39,15 @@ def atualiza_pedidos():
 
     select_ultimo_pedido = "SELECT MAX(DATA_PEDIDO) FROM ZMARKETPLACE_PEDIDOS"
     data_ultimo_pedido = pd.read_sql(select_ultimo_pedido,conn)
-    data_ultimo_pedido = str(data_ultimo_pedido.iloc[0,0])
-    ano_ultimo_pedido = data_ultimo_pedido[0:4]
-    mes_ultimo_pedido = data_ultimo_pedido[4:6]
-    dia_ultimo_pedido = data_ultimo_pedido[6:8]
+    data_ultimo_pedido1 = str(data_ultimo_pedido.iloc[0,0])
+    ano_ultimo_pedido = data_ultimo_pedido1[0:4]
+    mes_ultimo_pedido = data_ultimo_pedido1[4:6]
+    dia_ultimo_pedido = data_ultimo_pedido1[6:8]
     data_ultimo_pedido = ano_ultimo_pedido +"-"+mes_ultimo_pedido+"-"+dia_ultimo_pedido
+
+    select_data_ultimas_nfs = "SELECT TOP 5 SL1.L1_DOC AS doc, SL1.L1_EMISNF AS data FROM SL1010 SL1 WHERE SL1.L1_VEND = '000099' AND SL1.L1_DOC <> '' order by SL1.L1_EMISNF DESC"
+    select_data_ultimas_nfs= pd.read_sql(select_data_ultimas_nfs,conn)
+    min_data_ultimas_nfs = select_data_ultimas_nfs['data'].min()
 
     data_atual = date.today()
     data_atual3 = data_atual.strftime("%Y%m%d")
@@ -72,6 +78,7 @@ def atualiza_pedidos():
     
     else:
         var_label_novos_pedidos.set('Atualizando')
+        verifica_pedido = 0
         while linha <= (qtde_pedidos_periodo-1):
             id_pedido = str(pedidos.iloc[linha,0]) 
             codigo_pedido = pedidos.iloc[linha,1]
@@ -130,25 +137,73 @@ def atualiza_pedidos():
             status_pagamento = pagamento.iloc[0,2]
             forma_pagamento = pagamento.iloc[0,3]
             parcelas = pagamento.iloc[0,4]
-            novos_pedidos0.loc[linha] = [id_pedido,codigo_pedido,marketplace,status_pedido,data_pedido,valor_total_com_frete,valor_total,tarifa_envio,tarifa_venda_marketplace,cod_entrega,tipo_entrega,cod_rastreio,cliente,cpf_cnpj,telefone,email,endereco,cep,bairro,cidade,estado,observacao,responsavel_receber,data_criacao,titulo_produto,sku,qtde,preco_unitario,cod_pagamento,aprovacao_pagamento,status_pagamento,forma_pagamento,parcelas]
-            verifica_pedido = 0           
+            novos_pedidos0.loc[linha] = [id_pedido,codigo_pedido,marketplace,status_pedido,data_pedido,valor_total_com_frete,valor_total,tarifa_envio,tarifa_venda_marketplace,cod_entrega,tipo_entrega,cod_rastreio,cliente,cpf_cnpj,telefone,email,endereco,cep,bairro,cidade,estado,observacao,responsavel_receber,data_criacao,titulo_produto,sku,qtde,preco_unitario,cod_pagamento,aprovacao_pagamento,status_pagamento,forma_pagamento,parcelas]      
+            
             if str(codigo_pedido) not in df_cod_pedido:
-                verifica_pedido = 1
+                verifica_pedido = verifica_pedido + 1
                 novos_pedidos = pd.concat([novos_pedidos0])
                 tree_acompanhamento_pedidos = novos_pedidos[['cod_pedido','aprovacao_pagamento','sku','titulo_produto','qtde', 'valor_total', 'tarifa_envio','marketplace']]
                 linhas_pedidos = tree_acompanhamento_pedidos.to_numpy().tolist() 
                 df_cod_pedido.append(codigo_pedido)           
-
             consulta_pedido = "SELECT ID_PEDIDO, COD_PEDIDO, DATA_PEDIDO FROM ZMARKETPLACE_PEDIDOS"
             consulta_pedido = pd.read_sql(consulta_pedido,conn)
             consulta_pedido = consulta_pedido['ID_PEDIDO'].tolist()
         
             if id_pedido not in consulta_pedido:
-                insert_pedido = "INSERT INTO ZMARKETPLACE_PEDIDOS (ID_PEDIDO,COD_PEDIDO,MARKETPLACE, DATA_PEDIDO) VALUES ('"+id_pedido+"','"+codigo_pedido+"','"+marketplace+"','"+data_pedido+"')"
+                insert_pedido = "INSERT INTO ZMARKETPLACE_PEDIDOS \
+                                (\
+                                 ID_PEDIDO,\
+                                COD_PEDIDO,\
+                                MARKETPLACE,\
+                                DATA_PEDIDO\
+                                ) VALUES\
+                                (\
+                                '"+id_pedido+"',\
+                                '"+codigo_pedido+"',\
+                                '"+marketplace+"',\
+                                '"+data_pedido+"'\
+                                    )"
                 cursor.execute(insert_pedido)
                 conn.commit()
             
-            atendimentos_mktplaces_query = "SELECT SUA.UA_NUM AS Atendimento, SUA.UA_EMISSAO AS Data_Atendimento, SUA.UA_DESPESA AS Frete,(SUA.UA_ENTRADA - SUA.UA_DESPESA) AS Valor_Venda, SUA.UA_CLIENTE AS Cod_Cliente, SA1.A1_NOME AS Cliente,TRIM(SA1.A1_CGC) AS CPF_CNPJ,SA1.A1_EST AS Estado,TRIM(SA1.A1_MUN) AS Municipio, SUB.UB_PRODUTO AS Cod_Produto, SUB.UB_ZDESC AS Produto,ZB2.ZB2_DESFAM AS Categoria, SUB.UB_OPER AS Operacao, SUA.UA_VEND AS Cod_Vendedor, SA4.A4_NOME AS Transportadora,SE1.E1_NOMCLI AS Marketplace FROM SUA010 SUA  LEFT JOIN SL1010 SL1 ON SL1.D_E_L_E_T_ = '' AND SL1.L1_FILIAL = SUA.UA_FILIAL AND SL1.L1_NUMATEN = SUA.UA_NUM LEFT JOIN SA1010 SA1 ON SA1.D_E_L_E_T_ = '' AND SA1.A1_COD = SUA.UA_CLIENTE LEFT JOIN SL4010 SL4 ON SL4.D_E_L_E_T_ = '' AND SL4.L4_DOC = SL1.L1_DOC  LEFT JOIN SF2010 SF2 ON SF2.D_E_L_E_T_ = '' AND SF2.F2_DOC = SL1.L1_DOC  LEFT JOIN SUB010 SUB ON SUB.D_E_L_E_T_ = '' AND SUB.UB_NUM = SUA.UA_NUM LEFT JOIN SL2010 SL2 ON SL2.D_E_L_E_T_ = '' AND SL2.L2_DOC = SL1.L1_DOC  LEFT JOIN SE1010 SE1 ON SE1.D_E_L_E_T_ = '' AND SE1.E1_NUM = SL1.L1_DOC  LEFT JOIN SAE010 SAE ON SAE.D_E_L_E_T_ = '' AND SAE.AE_COD = SE1.E1_CLIENTE  LEFT JOIN SA4010 SA4 ON SA4.D_E_L_E_T_ = '' AND SA4.A4_COD = SUA.UA_TRANSP LEFT JOIN SB1010 SB1 ON SB1.D_E_L_E_T_ = '' AND SB1.B1_COD = SUB.UB_PRODUTO LEFT JOIN SB5010 SB5 ON SB5.D_E_L_E_T_ = '' AND SB5.B5_COD = SB1.B1_COD LEFT JOIN ZB2010 ZB2 ON ZB2.D_E_L_E_T_ = '' AND ZB2.ZB2_CODFAM = SB1.B1_ZCODFAM LEFT JOIN ZMARKETPLACE MKT ON MKT.NF = SL2.L2_DOC WHERE 1=1 AND SUA.D_E_L_E_T_ = '' AND SUA.UA_VEND = '000099' AND SUA.UA_EMISSAO <= '"+data_atual3+"'AND SUA.UA_EMISSAO >='"+data_pedido+"'  AND SA1.A1_CGC ='"+cpf_cnpj+"' GROUP BY SUA.UA_FILIAL, SUA.UA_NUM,SUA.UA_EMISSAO,SUA.UA_CLIENTE,SA1.A1_NOME,SA1.A1_CGC,SA1.A1_EST, SA1.A1_MUN,SUB.UB_PRODUTO,SB5.B5_CODFAM,SUB.UB_ZDESC, ZB2.ZB2_CODFAM, ZB2.ZB2_DESFAM,SUB.UB_OPER,SUA.UA_VEND,SA4.A4_NOME,SUA.UA_TRANSP,SE1.E1_NOMCLI, SUA.UA_DESPESA, SUA.UA_ENTRADA"
+            atendimentos_mktplaces_query = "SELECT \
+                                            SUA.UA_NUM AS Atendimento,\
+                                            SUA.UA_EMISSAO AS Data_Atendimento,\
+                                            SUA.UA_DESPESA AS Frete,\
+                                            (SUA.UA_ENTRADA - SUA.UA_DESPESA) AS Valor_Venda,\
+                                            SUA.UA_CLIENTE AS Cod_Cliente,\
+                                            SA1.A1_NOME AS Cliente,\
+                                            TRIM(SA1.A1_CGC) AS CPF_CNPJ,\
+                                            SA1.A1_EST AS Estado,\
+                                            TRIM(SA1.A1_MUN) AS Municipio,\
+                                            SUB.UB_PRODUTO AS Cod_Produto,\
+                                            SUB.UB_ZDESC AS Produto,\
+                                            ZB2.ZB2_DESFAM AS Categoria,\
+                                            SUB.UB_OPER AS Operacao,\
+                                            SUA.UA_VEND AS Cod_Vendedor,\
+                                            SA4.A4_NOME AS Transportadora,\
+                                            SE1.E1_NOMCLI AS Marketplace\
+                                            FROM SUA010 SUA\
+                                            LEFT JOIN SL1010 SL1 ON SL1.D_E_L_E_T_ = '' AND SL1.L1_FILIAL = SUA.UA_FILIAL AND SL1.L1_NUMATEN = SUA.UA_NUM\
+                                            LEFT JOIN SA1010 SA1 ON SA1.D_E_L_E_T_ = '' AND SA1.A1_COD = SUA.UA_CLIENTE \
+                                            LEFT JOIN SL4010 SL4 ON SL4.D_E_L_E_T_ = '' AND SL4.L4_DOC = SL1.L1_DOC \
+                                            LEFT JOIN SF2010 SF2 ON SF2.D_E_L_E_T_ = '' AND SF2.F2_DOC = SL1.L1_DOC  \
+                                            LEFT JOIN SUB010 SUB ON SUB.D_E_L_E_T_ = '' AND SUB.UB_NUM = SUA.UA_NUM \
+                                            LEFT JOIN SL2010 SL2 ON SL2.D_E_L_E_T_ = '' AND SL2.L2_DOC = SL1.L1_DOC  \
+                                            LEFT JOIN SE1010 SE1 ON SE1.D_E_L_E_T_ = '' AND SE1.E1_NUM = SL1.L1_DOC \
+                                            LEFT JOIN SAE010 SAE ON SAE.D_E_L_E_T_ = '' AND SAE.AE_COD = SE1.E1_CLIENTE \
+                                            LEFT JOIN SA4010 SA4 ON SA4.D_E_L_E_T_ = '' AND SA4.A4_COD = SUA.UA_TRANSP \
+                                            LEFT JOIN SB1010 SB1 ON SB1.D_E_L_E_T_ = '' AND SB1.B1_COD = SUB.UB_PRODUTO \
+                                            LEFT JOIN SB5010 SB5 ON SB5.D_E_L_E_T_ = '' AND SB5.B5_COD = SB1.B1_COD \
+                                            LEFT JOIN ZB2010 ZB2 ON ZB2.D_E_L_E_T_ = '' AND ZB2.ZB2_CODFAM = SB1.B1_ZCODFAM \
+                                            LEFT JOIN ZMARKETPLACE MKT ON MKT.NF = SL2.L2_DOC \
+                                            WHERE 1=1 AND SUA.D_E_L_E_T_ = '' AND\
+                                            SUA.UA_VEND = '000099' AND\
+                                            SUA.UA_EMISSAO <= '"+data_atual3+"'AND\
+                                            SUA.UA_EMISSAO >='"+data_pedido+"'  AND\
+                                            SA1.A1_CGC ='"+cpf_cnpj+"' \
+                                            GROUP BY SUA.UA_FILIAL, SUA.UA_NUM,SUA.UA_EMISSAO,SUA.UA_CLIENTE,SA1.A1_NOME,SA1.A1_CGC,SA1.A1_EST, SA1.A1_MUN,SUB.UB_PRODUTO,SB5.B5_CODFAM,SUB.UB_ZDESC, ZB2.ZB2_CODFAM, ZB2.ZB2_DESFAM,SUB.UB_OPER,SUA.UA_VEND,SA4.A4_NOME,SUA.UA_TRANSP,SE1.E1_NOMCLI, SUA.UA_DESPESA, SUA.UA_ENTRADA"
+            
             atendimentos_mktplaces_in = pd.read_sql(atendimentos_mktplaces_query,conn)
             
             qtde_linhas_atendimentos_mktplaces = atendimentos_mktplaces_in['Atendimento'].count()
@@ -156,6 +211,7 @@ def atualiza_pedidos():
             linha_atendimentos_mktplaces = 0
             atendimentos_mktplaces = pd.DataFrame()
             atendimentos_mktplaces1=pd.DataFrame(columns=['Atendimento','Data_Atendimento','Cliente','Produto','Valor_Venda','Frete'])
+            verifica_atendimento = 0 
 
             while linha_atendimentos_mktplaces <= (qtde_linhas_atendimentos_mktplaces-1):
                 atendimento_atd = atendimentos_mktplaces_in.iloc[linha_atendimentos_mktplaces,0]
@@ -171,29 +227,104 @@ def atualiza_pedidos():
                 frete_atd = round((atendimentos_mktplaces_in.iloc[linha_atendimentos_mktplaces,2]),2)
                 frete_atd = "R$ "+ str(frete_atd)
                 atendimentos_mktplaces1.loc[linha_atendimentos_mktplaces] = [atendimento_atd,data_atd,cliente_atd,produto_atd,valor_venda_atd, frete_atd]
-                verifica_atendimento = 0
-
-                if str(atendimento_atd) not in df_cod_atendimento:
-                    verifica_atendimento = 1    
+                                                            
+                if str(atendimento_atd) not in df_cod_atendimento:  
+                    verifica_atendimento = verifica_atendimento + 1
                     atendimentos_mktplaces = pd.concat([atendimentos_mktplaces1])
                     linhas_atendimentos = atendimentos_mktplaces.to_numpy().tolist()
-                df_cod_atendimento.append(atendimento_atd)
+                    df_cod_atendimento.append(atendimento_atd)
 
                 linha_atendimentos_mktplaces = linha_atendimentos_mktplaces + 1
 
-            linha = linha + 1
+           
+            linha = linha + 1 
 
             if (linha == 9) or (linha == 19) or (linha == 28) or (linha == 37) or (linha == 46) or (linha == 55):
-                time.sleep(60)
-    
-            var_label_novos_pedidos.set('Pedidos atualizados - última atualização em '+ data_atualizacao)
-        
-        if verifica_pedido == 1:
+                time.sleep(60)  
+
+        if verifica_pedido >= 1:
             for row in linhas_pedidos:
-                acompanhamento_pedidos.insert('','end',values=row)
-        if verifica_atendimento == 1:
+                acompanhamento_pedidos.insert('','end',values=row)          
+            
+        if verifica_atendimento >= 1:
             for row in linhas_atendimentos:
-                acompanhamento_atendimentos.insert('','end',values=row)
+                acompanhamento_atendimentos.insert('','end',values=row) 
+      
+            select_nfs = "SELECT\
+                SUA.UA_DESPESA AS Frete,\
+                SUA.UA_CLIENTE AS Cod_Cliente,\
+                SA1.A1_NOME AS Cliente,\
+                TRIM(SA1.A1_CGC) AS CPF_CNPJ,\
+                SA1.A1_EST AS Estado,\
+                TRIM(SA1.A1_MUN) AS Municipio,\
+                SL1.L1_DOC AS NF,\
+                SL1.L1_SERIE AS Serie_NF,\
+                SL1.L1_EMISNF AS Data_Emissao_NF,\
+                SL1.L1_HORA AS Hora_Emissao_NF, \
+                SF2.F2_CHVNFE AS Chave_NFe,\
+                SUB.UB_PRODUTO AS Cod_Produto, \
+                SUB.UB_ZDESC AS Produto,\
+                (SL1.L1_VALMERC - SUA.UA_DESCONT)  AS Valor_NF ,\
+                SA4.A4_NOME AS Transportadora,\
+                MKT.STATUS_ENTREGA,\
+                MKT.DATA_ACOMPANHAMENTO_ENTREGA,\
+                MKT.LOCAL_ACOMPANHAMENTO,\
+                MKT.FASE_PIPEFY_LOGI AS Fase_Card_Logi,\
+                SE1.E1_NOMCLI AS Marketplace,\
+                MKT.IDCARD_PIPEFY_LOGI AS IDCard_Logi\
+                FROM SUA010 SUA \
+                LEFT JOIN SL1010 SL1 ON SL1.D_E_L_E_T_ = '' AND SL1.L1_FILIAL = SUA.UA_FILIAL AND SL1.L1_NUMATEN = SUA.UA_NUM \
+                LEFT JOIN SA1010 SA1 ON SA1.D_E_L_E_T_ = '' AND SA1.A1_COD = SUA.UA_CLIENTE\
+                LEFT JOIN SL4010 SL4 ON SL4.D_E_L_E_T_ = '' AND SL4.L4_DOC = SL1.L1_DOC  \
+                LEFT JOIN SF2010 SF2 ON SF2.D_E_L_E_T_ = '' AND SF2.F2_DOC = SL1.L1_DOC  \
+                LEFT JOIN SUB010 SUB ON SUB.D_E_L_E_T_ = '' AND SUB.UB_NUM = SUA.UA_NUM \
+                LEFT JOIN SL2010 SL2 ON SL2.D_E_L_E_T_ = '' AND SL2.L2_DOC = SL1.L1_DOC  \
+                LEFT JOIN SE1010 SE1 ON SE1.D_E_L_E_T_ = '' AND SE1.E1_NUM = SL1.L1_DOC  \
+                LEFT JOIN SAE010 SAE ON SAE.D_E_L_E_T_ = '' AND SAE.AE_COD = SE1.E1_CLIENTE\
+                LEFT JOIN SA4010 SA4 ON SA4.D_E_L_E_T_ = '' AND SA4.A4_COD = SUA.UA_TRANSP\
+                LEFT JOIN SB1010 SB1 ON SB1.D_E_L_E_T_ = '' AND SB1.B1_COD = SUB.UB_PRODUTO\
+                LEFT JOIN SB5010 SB5 ON SB5.D_E_L_E_T_ = '' AND SB5.B5_COD = SB1.B1_COD\
+                LEFT JOIN ZB2010 ZB2 ON ZB2.D_E_L_E_T_ = '' AND ZB2.ZB2_CODFAM = SB1.B1_ZCODFAM\
+                LEFT JOIN ZMARKETPLACE MKT ON MKT.NF = SL2.L2_DOC \
+                WHERE 1=1 AND SUA.D_E_L_E_T_ = '' AND SUA.UA_VEND = '000099' AND (SUA.UA_EMISSAO >='"+min_data_ultimas_nfs+"'AND MKT.FASE_PIPEFY_LOGI <> 'Apuração' AND MKT.FASE_PIPEFY_LOGI <> 'Concluído'  AND SL1.L1_DOC <> '')\
+                GROUP BY SUA.UA_FILIAL, SUA.UA_NUM,SUA.UA_EMISSAO,SUA.UA_CLIENTE,SA1.A1_NOME,SA1.A1_CGC,SA1.A1_EST, SA1.A1_MUN,SL1.L1_EMISNF,SL1.L1_HORA,SL1.L1_SERIE,SL1.L1_DOC,SUB.UB_PRODUTO,SB5.B5_CODFAM,SUB.UB_ZDESC, ZB2.ZB2_CODFAM, ZB2.ZB2_DESFAM,SUB.UB_OPER,SL1.L1_VALMERC,SUA.UA_VEND,SA4.A4_NOME,SUA.UA_TRANSP,SF2.F2_CHVNFE,SE1.E1_NOMCLI,MKT.COD_RASTREIO,MKT.COD_MARKETPLACE,MKT.STATUS_ENTREGA,MKT.DATA_ACOMPANHAMENTO_ENTREGA,MKT.LOCAL_ACOMPANHAMENTO, SUA.UA_DESPESA, SUA.UA_ENTRADA, SUA.UA_DESCONT,MKT.FASE_PIPEFY_LOGI,MKT.IDCARD_PIPEFY_LOGI"
+
+            select_nfs = pd.read_sql(select_nfs, conn)
+            qtde_nfs = select_nfs['Cod_Cliente'].count()
+            novas_nfs1 = pd.DataFrame(columns=['cliente','nf','data','chave','valor'])
+            novas_nfs = pd.DataFrame()
+            linha_nfs = 0
+            verifica_nfs = 0
+
+            while linha_nfs <= (qtde_nfs-1):
+                cliente_nfs = select_nfs.iloc[linha_nfs,2].title()
+                nf_nfs = select_nfs.iloc[linha_nfs,6]
+                data_nfs = select_nfs.iloc[linha_nfs,8]
+                ano_nfs = data_nfs[0:4]
+                mes_nfs = data_nfs[4:6]
+                dia_nfs = data_nfs[6:8]
+                hora_nfs = select_nfs.iloc[linha_nfs,9]
+                data_nfs =  dia_nfs+"/"+mes_nfs+"/"+ano_nfs+"-"+hora_nfs
+                chave_nfs = select_nfs.iloc[linha_nfs,10]
+                valor_nfs = round(select_nfs.iloc[linha_nfs,13],2)
+                valor_nfs = str(valor_nfs).replace(".",",")
+                valor_nfs = "R$ " +valor_nfs
+                
+                novas_nfs1.loc[linha_nfs] = [cliente_nfs,nf_nfs,data_nfs,chave_nfs,valor_nfs]
+                linha_nfs = linha_nfs + 1
+
+                if str(nf_nfs) not in df_nf_nfs:  
+                    verifica_nfs = verifica_nfs + 1
+                    novas_nfs = pd.concat([novas_nfs1])
+                    linhas_nfs = novas_nfs.to_numpy().tolist()
+                    df_nf_nfs.append(nf_nfs)
+
+            if verifica_nfs >= 1:
+                for row in linhas_nfs:
+                    acompanhamento_nfs.insert('','end',values=row)
+
+        var_label_novos_pedidos.set('Pedidos atualizados - última atualização em '+ data_atualizacao)
+        print(data_atualizacao)
 
     t = threading.Timer(10.0, atualiza_pedidos)
     t.start()
@@ -285,11 +416,21 @@ label_novos_pedidos = tk.Label(aba1, textvariable=var_label_novos_pedidos).place
 def inserir_ocorrencia():
     entrada_atendimento_ocor2 = str(entrada_atendimento_ocor.get())
     entrada_tipo_ocor2 = str(entrada_tipo_ocor.get())
-    entrada_descricao_ocor.get()
+    entrada_descricao_ocor2 = entrada_descricao_ocor.get()
     
     ok_cancelar = messagebox.askokcancel("Atenção", "Você deseja mesmo inserir as informações?")
     
-    query_inserir_ocorrencia = "INSERT INTO ZMARKETPLACE_OCORRENCIAS (ATENDIMENTO, TIPO_OCORRENCIA, DESCRICAO_OCORRENCIA) VALUES('"+entrada_atendimento_ocor2+"','"+entrada_tipo_ocor2+"','"+entrada_descricao_ocor2+"')"
+    query_inserir_ocorrencia = "INSERT INTO ZMARKETPLACE_OCORRENCIAS (\
+                                ATENDIMENTO,\
+                                TIPO_OCORRENCIA, \
+                                DESCRICAO_OCORRENCIA\
+                                ) \
+                                VALUES\
+                                (\
+                                    '"+entrada_atendimento_ocor2+"',\
+                                    '"+entrada_tipo_ocor2+"',\
+                                    '"+entrada_descricao_ocor2+"'\
+                                )"
     cursor.execute(query_inserir_ocorrencia)
     conn.commit()
     
@@ -469,61 +610,61 @@ label_atualizacao_rastreios = tk.Label(aba2, text='Programar_atualização').pla
 
 ###Frete###
 
-label_cod_prod_cf = tk.Label(aba4, text="Cod.Produto", fg="black").place(x=10,y=10)
+label_cod_prod_cf = tk.Label(aba4, text="Cod.Produto", fg="black").place(x=48,y=10)
 entrada_cod_prod_cf = tk.StringVar()
-ent_cod_prod_cf = tk.Entry(aba4,fg="black", width=15, textvariable = entrada_cod_prod_cf).place(x=10,y=30)
+ent_cod_prod_cf = tk.Entry(aba4,fg="black", width=10, textvariable = entrada_cod_prod_cf).place(x=50,y=30)
 
-label_cpf_cnpj_cf = tk.Label(aba4, text="CPF/CNPJ", fg="black").place(x = 110,y=10)
+label_cpf_cnpj_cf = tk.Label(aba4, text="CPF/CNPJ", fg="black").place(x = 148,y=10)
 entrada_cpf_cnpj_cf = tk.StringVar()
-entrada_cpf_cnpj_cf = tk.Entry(aba4, fg="black", width=25, textvariable = entrada_cpf_cnpj_cf).place(x=110,y=30)
+entrada_cpf_cnpj_cf = tk.Entry(aba4, fg="black", width=25, textvariable = entrada_cpf_cnpj_cf).place(x=150,y=30)
 
-label_cep_cf = tk.Label(aba4, text="CEP", fg="black").place(x=270,y=10)
+label_cep_cf = tk.Label(aba4, text="CEP", fg="black").place(x=338,y=10)
 entrada_cep_cf = tk.StringVar()
-ent_cep_cf = tk.Entry(aba4,fg="black", width=20, textvariable = entrada_cep_cf).place(x=270,y=30)
+ent_cep_cf = tk.Entry(aba4,fg="black", width=20, textvariable = entrada_cep_cf).place(x=340,y=30)
 
-label_valor_nf_cf = tk.Label(aba4, text="Valor da NF", fg="black").place(x=400,y=10)
+label_valor_nf_cf = tk.Label(aba4, text="Valor da NF", fg="black").place(x=498,y=10)
 entrada_valor_nf_cf = tk.StringVar()
-ent_valor_nf_cf = tk.Entry(aba4,fg="black", width = 20, textvariable = entrada_valor_nf_cf).place(x=400,y=30)
+ent_valor_nf_cf = tk.Entry(aba4,fg="black", width = 20, textvariable = entrada_valor_nf_cf).place(x=500,y=30)
 
-botao_ok_cf = tk.Button(aba4, text='Consultar', width=10 ).place(x=160, y=60)
-botao_limpar_cf = tk.Button(aba4, text='Limpar', width=10 ).place(x=280, y=60)
+botao_ok_cf = tk.Button(aba4, text='Consultar', width=10 ).place(x=200, y=60)
+botao_limpar_cf = tk.Button(aba4, text='Limpar', width=10 ).place(x=360, y=60)
 
-lbl_cod_prod_cf = tk.Label(aba4, text="Cod.Produto", fg="black").place(x=10,y=90)
+lbl_cod_prod_cf = tk.Label(aba4, text="Cod.Produto", fg="black").place(x=48,y=90)
 var_cod_prod_cf = StringVar()
-txt_cod_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_cod_prod_cf, width = 10, state=DISABLED).place(x=10,y=110)
+txt_cod_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_cod_prod_cf, width = 10, state=DISABLED).place(x=50,y=110)
 
-lbl_produto_cf = tk.Label(aba4, text="Produto", fg="black").place(x=110,y=90)
+lbl_produto_cf = tk.Label(aba4, text="Produto", fg="black").place(x=128,y=90)
 var_produto_cf = StringVar()
-txt_produto_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_produto_cf, width = 50, state=DISABLED).place(x=110,y=110)
+txt_produto_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_produto_cf, width = 50, state=DISABLED).place(x=130,y=110)
 
-lbl_alt_prod_cf = tk.Label(aba4, text="Altura", fg="black").place(x=10,y=130)
+lbl_alt_prod_cf = tk.Label(aba4, text="Altura", fg="black").place(x=48,y=130)
 var_alt_prod_cf = StringVar()
-txt_alt_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_alt_prod_cf, width = 10, state=DISABLED).place(x=10,y=150)
+txt_alt_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_alt_prod_cf, width = 10, state=DISABLED).place(x=50,y=150)
 
-lbl_larg_prod_cf = tk.Label(aba4, text="Largura", fg="black").place(x=100,y=130)
+lbl_larg_prod_cf = tk.Label(aba4, text="Largura", fg="black").place(x=128,y=130)
 var_larg_prod_cf = StringVar()
-txt_larg_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_larg_prod_cf, width = 10, state=DISABLED).place(x=100,y=150)
+txt_larg_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_larg_prod_cf, width = 10, state=DISABLED).place(x=130,y=150)
 
-lbl_prof_prod_cf = tk.Label(aba4, text="Profundidade", fg="black").place(x=180,y=130)
+lbl_prof_prod_cf = tk.Label(aba4, text="Profundidade", fg="black").place(x=208,y=130)
 var_prof_prod_cf = StringVar()
-txt_prof_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_prof_prod_cf, width = 10, state=DISABLED).place(x=180,y=150) 
+txt_prof_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_prof_prod_cf, width = 10, state=DISABLED).place(x=210,y=150) 
 
-lbl_peso_bruto_prod_cf = tk.Label(aba4, text="Peso Bruto", fg="black").place(x=260,y=130)
+lbl_peso_bruto_prod_cf = tk.Label(aba4, text="Peso Bruto", fg="black").place(x=288,y=130)
 var_peso_bruto_prod_cf = StringVar()
-txt_peso_bruto_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_peso_bruto_prod_cf, width = 10, state=DISABLED).place(x=260,y=150)
+txt_peso_bruto_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_peso_bruto_prod_cf, width = 10, state=DISABLED).place(x=290,y=150)
 
-lbl_stk_prod_cf = tk.Label(aba4, text="Estoque disponível", fg="black").place(x=10,y=380)
+lbl_stk_prod_cf = tk.Label(aba4, text="Estoque", fg="black").place(x=368,y=130)
 var_stk_prod_cf = StringVar()
-txt_stk_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_stk_prod_cf, width = 15, state=DISABLED).place(x=10,y=400)
+txt_stk_prod_cf = tk.Entry(aba4, bg= "#eff0f1", textvariable = var_stk_prod_cf, width = 10, state=DISABLED).place(x=370,y=150)
 
 acompanhamento_cf = ttk.Treeview(aba4, selectmode="browse", column=('Transportadora','Preço','Prazo'),show ='headings')
-acompanhamento_cf.column('Transportadora',width=140, minwidth=50, stretch=NO)
+acompanhamento_cf.column('Transportadora',width=200, minwidth=50, stretch=NO)
 acompanhamento_cf.heading('#1', text='Transportadora')
-acompanhamento_cf.column('Preço',width=100, minwidth=50, stretch=NO)
+acompanhamento_cf.column('Preço',width=150, minwidth=50, stretch=NO)
 acompanhamento_cf.heading('#2', text='Preço')
-acompanhamento_cf.column('Prazo',width=100, minwidth=50, stretch=NO)
+acompanhamento_cf.column('Prazo',width=148, minwidth=50, stretch=NO)
 acompanhamento_cf.heading('#3', text='Prazo')
-acompanhamento_cf.place(height=200, width=600,x=30, y=250)
+acompanhamento_cf.place(height=180, width=500,x=80, y=200)
 
 var_label_consulta_frete = StringVar()
 label_atualizacao_consulta_frete = tk.Label(aba4, text='Programar_atualização').place(x=8,y=600)
