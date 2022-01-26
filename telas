@@ -49,6 +49,7 @@ def atualiza_pedidos():
     select_data_ultimas_nfs= pd.read_sql(select_data_ultimas_nfs,conn)
     min_data_ultimas_nfs = select_data_ultimas_nfs['data'].min()
 
+    
     data_atual = date.today()
     data_atual3 = data_atual.strftime("%Y%m%d")
     data_atual2=(date.today())
@@ -235,8 +236,7 @@ def atualiza_pedidos():
                     df_cod_atendimento.append(atendimento_atd)
 
                 linha_atendimentos_mktplaces = linha_atendimentos_mktplaces + 1
-
-           
+ 
             linha = linha + 1 
 
             if (linha == 9) or (linha == 19) or (linha == 28) or (linha == 37) or (linha == 46) or (linha == 55):
@@ -326,7 +326,7 @@ def atualiza_pedidos():
         var_label_novos_pedidos.set('Pedidos atualizados - última atualização em '+ data_atualizacao)
         print(data_atualizacao)
 
-    t = threading.Timer(10.0, atualiza_pedidos)
+    t = threading.Timer(10.0, atualiza_card_ocorrencia)
     t.start()
 
 janela = tk.Tk()
@@ -413,30 +413,185 @@ label_novos_pedidos = tk.Label(aba1, textvariable=var_label_novos_pedidos).place
 
 ###ocorrencias###
 
+url_pipefy = "https://api.pipefy.com/graphql"
+
 def inserir_ocorrencia():
-    entrada_atendimento_ocor2 = str(entrada_atendimento_ocor.get())
-    entrada_tipo_ocor2 = str(entrada_tipo_ocor.get())
-    entrada_descricao_ocor2 = entrada_descricao_ocor.get()
-    
-    ok_cancelar = messagebox.askokcancel("Atenção", "Você deseja mesmo inserir as informações?")
-    
-    query_inserir_ocorrencia = "INSERT INTO ZMARKETPLACE_OCORRENCIAS (\
-                                ATENDIMENTO,\
-                                TIPO_OCORRENCIA, \
-                                DESCRICAO_OCORRENCIA\
-                                ) \
-                                VALUES\
-                                (\
+
+    data_atual = date.today()
+    data_atual3 = data_atual.strftime("%Y%m%d")
+    data_atual2=(date.today())
+    data_atual2 = data_atual2.strftime("%Y-%m-%d")
+
+    if var_criar_card.get() == 1:
+        ok_cancelar = messagebox.askokcancel("Atenção", "Você deseja mesmo Criar o Card?")
+        entrada_atendimento_ocor2 = str(entrada_atendimento_ocor.get())
+        entrada_tipo_ocor2 = str(entrada_tipo_ocor.get())
+        entrada_descricao_ocor2 = entrada_descricao_ocor.get()
+        query_inserir_ocorrencia = "INSERT INTO ZMARKETPLACE_OCORRENCIAS (\
+                                    ATENDIMENTO,\
+                                    TIPO_OCORRENCIA, \
+                                    DESCRICAO_OCORRENCIA,\
+                                    DATA_ABERTURA_OCORRENCIA\
+                                    ) \
+                                    VALUES\
+                                    (\
                                     '"+entrada_atendimento_ocor2+"',\
                                     '"+entrada_tipo_ocor2+"',\
-                                    '"+entrada_descricao_ocor2+"'\
-                                )"
-    cursor.execute(query_inserir_ocorrencia)
-    conn.commit()
+                                    '"+entrada_descricao_ocor2+"',\
+                                    '"+str(data_atual3)+"'\
+                                    )"
+        cursor.execute(query_inserir_ocorrencia)
+        conn.commit()
+        entrada_atendimento_ocor.set('')
+        entrada_tipo_ocor.set('')
+        entrada_descricao_ocor.set('')
+        
+                
+        payload_card_sac_pipefy = {"query": "{cards(pipe_id:301531513, search:{title:\""+entrada_atendimento_ocor2+"\"}) {  edges {  node{ id title current_phase {id name} fields {name report_value updated_at value}}    }  }}"}
+        
+        headers_pipefy = {
+            "Accept": "application/json",
+            "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJ1c2VyIjp7ImlkIjo5NjExMjYsImVtYWlsIjoibWFya2V0aW5nQHphbm90dGlyZWZyaWdlcmFjYW8uY29tLmJyIiwiYXBwbGljYXRpb24iOjMwMDEzNDkxM319.VIgfDCDN7Vb_HpBbBCqNi0cyoJT5AeDU_tT5OhZv6IBbkqRYTMYyfhFobu4d7KrSAYGRN7BKDlT2Ls_rO5ZK2A",
+            "Content-Type": "application/json"
+        }
+        response_card_sac_pipefy = requests.request("POST", url_pipefy, json=payload_card_sac_pipefy, headers=headers_pipefy)
+        df_card_sac_pipefy = json.loads(response_card_sac_pipefy.content)
+        df_card_sac_pipefy = pd.DataFrame(df_card_sac_pipefy)
+        df_card_sac_pipefy = df_card_sac_pipefy.iloc[0,0]
+        df_card_sac_pipefy = df_card_sac_pipefy['edges']
+        print(df_card_sac_pipefy)       
+        
+        if df_card_sac_pipefy == []:
+            select_atendimento_ocor =  "SELECT\
+                                        SUA.UA_NUM AS Atendimento,\
+                                        SUA.UA_CLIENTE AS Cod_Cliente,\
+                                        SA1.A1_NOME AS Cliente,\
+                                        TRIM(SA1.A1_CGC) AS CPF_CNPJ,\
+                                        SA1.A1_EST AS Estado,\
+                                        TRIM(SA1.A1_MUN) AS Municipio,\
+                                        SA1.A1_END,\
+                                        SA1.A1_DDD,\
+                                        SA1.A1_TEL,\
+                                        SA1.A1_EMAIL,\
+                                        SL1.L1_DOC AS NF,\
+                                        SUB.UB_PRODUTO AS Cod_Produto, \
+                                        SUB.UB_ZDESC AS Produto,\
+                                        SA4.A4_NOME AS Transportadora,\
+                                        SE1.E1_NOMCLI AS Marketplace,\
+                                        SA1.A1_BAIRRO,\
+                                        SA1.A1_CEP\
+                                        FROM SUA010 SUA  \
+                                        LEFT JOIN SL1010 SL1 ON SL1.D_E_L_E_T_ = '' AND SL1.L1_FILIAL = SUA.UA_FILIAL AND SL1.L1_NUMATEN = SUA.UA_NUM \
+                                        LEFT JOIN SA1010 SA1 ON SA1.D_E_L_E_T_ = '' AND SA1.A1_COD = SUA.UA_CLIENTE\
+                                        LEFT JOIN SL4010 SL4 ON SL4.D_E_L_E_T_ = '' AND SL4.L4_DOC = SL1.L1_DOC  \
+                                        LEFT JOIN SF2010 SF2 ON SF2.D_E_L_E_T_ = '' AND SF2.F2_DOC = SL1.L1_DOC  \
+                                        LEFT JOIN SUB010 SUB ON SUB.D_E_L_E_T_ = '' AND SUB.UB_NUM = SUA.UA_NUM \
+                                        LEFT JOIN SL2010 SL2 ON SL2.D_E_L_E_T_ = '' AND SL2.L2_DOC = SL1.L1_DOC  \
+                                        LEFT JOIN SE1010 SE1 ON SE1.D_E_L_E_T_ = '' AND SE1.E1_NUM = SL1.L1_DOC  \
+                                        LEFT JOIN SAE010 SAE ON SAE.D_E_L_E_T_ = '' AND SAE.AE_COD = SE1.E1_CLIENTE  \
+                                        LEFT JOIN SA4010 SA4 ON SA4.D_E_L_E_T_ = '' AND SA4.A4_COD = SUA.UA_TRANSP \
+                                        LEFT JOIN SB1010 SB1 ON SB1.D_E_L_E_T_ = '' AND SB1.B1_COD = SUB.UB_PRODUTO \
+                                        WHERE 1=1 AND SUA.D_E_L_E_T_ = '' AND SUA.UA_VEND = '000099' AND SUA.UA_NUM = '"+entrada_atendimento_ocor2+"'\
+                                        GROUP BY SUA.UA_NUM, SUA.UA_CLIENTE, SA1.A1_NOME, SA1.A1_CGC,SA1.A1_EST,SA1.A1_MUN, SA1.A1_END, SA1.A1_DDD, SA1.A1_TEL, SA1.A1_EMAIL, SL1.L1_DOC,SUB.UB_PRODUTO, SUB.UB_ZDESC,SA4.A4_NOME,SE1.E1_NOMCLI,SA1.A1_END,SA1.A1_DDD,SA1.A1_TEL,SA1.A1_EMAIL,SA1.A1_BAIRRO,SA1.A1_CEP"
+            
+            select_atendimento_ocor = pd.read_sql(select_atendimento_ocor, conn)
+            nf_ocor = select_atendimento_ocor.iloc[0,10]
+            cpf_cnpj_ocor = select_atendimento_ocor.iloc[0,3]
+            cod_cliente_ocor = select_atendimento_ocor.iloc[0,1]
+            nome_cliente_ocor = select_atendimento_ocor.iloc[0,2]
+            rua = select_atendimento_ocor.iloc[0,6]
+            bairro = select_atendimento_ocor.iloc[0,15]
+            municipio = select_atendimento_ocor.iloc[0,5]
+            estado = select_atendimento_ocor.iloc[0,4]
+            endereco_ocor = rua +"-"+ bairro +"-"+ municipio +"-"+ estado
+            cep_ocor = select_atendimento_ocor.iloc[0,16]
+            telefone1_ocor = select_atendimento_ocor.iloc[0,8]
+            ddd_ocor = select_atendimento_ocor.iloc[0,7]
+            telefone_ocor = "("+ddd_ocor+")"+telefone1_ocor
+            email_ocor = select_atendimento_ocor.iloc[0,9]
+            cod_produto_ocor = select_atendimento_ocor.iloc[0,11]
+            produto_ocor = select_atendimento_ocor.iloc[0,12]
+            transportadora_ocor = select_atendimento_ocor.iloc[0,13]
+            marketplace_ocor = select_atendimento_ocor.iloc[0,14]
+
+            payload_pipefy_create_card = {"query":"mutation {createCard(input:\
+                {pipe_id:302216104, phase_id:314130855 title:\""+entrada_atendimento_ocor2+"\"\
+                fields_attributes:[{field_id:\"n_mero_da_nota_fiscal_emitida_pela_zanotti\", field_value:\""+nf_ocor+"\"},\
+                {field_id:\"cpf_cnpj\", field_value:\""+cpf_cnpj_ocor+"\"},\
+                {field_id:\"c_digo_do_cliente\", field_value:\""+cod_cliente_ocor+"\"},\
+                {field_id:\"raz_o_social\", field_value:\""+nome_cliente_ocor+"\"},\
+                {field_id:\"atendimento\", field_value:\""+entrada_atendimento_ocor2+"\"},\
+                {field_id: \"rua_n_mero\", field_value:\""+endereco_ocor+"\"},\
+                {field_id:\"cep\", field_value:\""+cep_ocor+"\"},\
+                {field_id:\"telefone\", field_value:\""+telefone_ocor+"\"},\
+                {field_id:\"email\", field_value:\""+email_ocor+"\"},\
+                {field_id:\"descri_o_do_produto\", field_value:\""+cod_produto_ocor+"\"},\
+                {field_id: \"produto\", field_value:\""+produto_ocor+"\"},\
+                {field_id:\"tipo_da_ocorr_ncia\", field_value:\""+entrada_tipo_ocor2+"\"},\
+                {field_id:\"descri_o_da_ocorr_ncia\", field_value:\""+entrada_descricao_ocor2+"\"},\
+                {field_id:\"transportadora\", field_value:\""+transportadora_ocor+"\"},\
+                {field_id:\"marketplace\", field_value:\""+marketplace_ocor+"\"}]}){card{id title}}}"}
+            
+            headers_pipefy = {
+            "Accept": "application/json",
+            "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJ1c2VyIjp7ImlkIjo5NjExMjYsImVtYWlsIjoibWFya2V0aW5nQHphbm90dGlyZWZyaWdlcmFjYW8uY29tLmJyIiwiYXBwbGljYXRpb24iOjMwMDEzNDkxM319.VIgfDCDN7Vb_HpBbBCqNi0cyoJT5AeDU_tT5OhZv6IBbkqRYTMYyfhFobu4d7KrSAYGRN7BKDlT2Ls_rO5ZK2A",
+            "Content-Type": "application/json"
+        }
+            response_pipefy_create_card = requests.request("POST", url_pipefy, json = payload_pipefy_create_card, headers = headers_pipefy)
+            df_pipefy_create_card = json.loads(response_pipefy_create_card.content)
+            messagebox.showinfo("Tudo certo!", "Card criado com sucesso!")
+        else:
+            messagebox.showinfo("Atenção", "Verifique junto ao SAC, pois essa Ocorrência já existe!")
+
+    else:
+        ok_cancelar = messagebox.askokcancel("Atenção", "Você deseja mesmo inserir a Ocorrência sem Criar o Card?")
+        entrada_atendimento_ocor2 = str(entrada_atendimento_ocor.get())
+        entrada_tipo_ocor2 = str(entrada_tipo_ocor.get())
+        entrada_descricao_ocor2 = entrada_descricao_ocor.get()
+        query_inserir_ocorrencia = "INSERT INTO ZMARKETPLACE_OCORRENCIAS (\
+                                    ATENDIMENTO,\
+                                    TIPO_OCORRENCIA, \
+                                    DESCRICAO_OCORRENCIA,\
+                                    DATA_ABERTURA_OCORRENCIA\
+                                    ) \
+                                    VALUES\
+                                    (\
+                                    '"+entrada_atendimento_ocor2+"',\
+                                    '"+entrada_tipo_ocor2+"',\
+                                    '"+entrada_descricao_ocor2+"',\
+                                    '"+str(data_atual3)+"'\
+                                    )"
+        cursor.execute(query_inserir_ocorrencia)
+        conn.commit()
+        entrada_atendimento_ocor.set('')
+        entrada_tipo_ocor.set('')
+        entrada_descricao_ocor.set('')
+        
     
-    entrada_atendimento_ocor.set('')
-    entrada_tipo_ocor.set('')
-    entrada_descricao_ocor.set('')
+def atualiza_card_ocorrencia():
+    select_ocorrencias_ocor = "SELECT ATENDIMENTO FROM ZMARKETPLACE_OCORRENCIAS WHERE RESOLUCAO_OCORRENCIA <> 'Resolvido' OR RESOLUCAO_OCORRENCIA IS NULL"
+    select_ocorrencias_ocor = pd.read_sql(select_ocorrencias_ocor,conn)
+    atendimentos = select_ocorrencias_ocor['ATENDIMENTO'].to_numpy().tolist()
+
+    for atendimento in atendimentos:
+        url_pipefy = "https://api.pipefy.com/graphql"
+
+        payload_card_pipefy = {"query": "{cards(pipe_id:301530575, search:{title:\""+atendimento+"\"}) {  edges {  node{ id title current_phase {id name} fields {name report_value updated_at value}}}}}"}
+        headers_pipefy = {
+            "Accept": "application/json",
+            "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJ1c2VyIjp7ImlkIjo5NjExMjYsImVtYWlsIjoibWFya2V0aW5nQHphbm90dGlyZWZyaWdlcmFjYW8uY29tLmJyIiwiYXBwbGljYXRpb24iOjMwMDEzNDkxM319.VIgfDCDN7Vb_HpBbBCqNi0cyoJT5AeDU_tT5OhZv6IBbkqRYTMYyfhFobu4d7KrSAYGRN7BKDlT2Ls_rO5ZK2A",
+            "Content-Type": "application/json"
+        }
+        response_card_pipefy = requests.request("POST", url_pipefy, json=payload_card_pipefy, headers=headers_pipefy)
+        df_card_pipefy = json.loads(response_card_pipefy.content)
+        df_card_pipefy = pd.DataFrame(df_card_pipefy)
+        card = df_card_pipefy.iloc[0,0]
+        card = pd.DataFrame(card)
+        id_card = ''
+    
+
+    t = threading.Timer(1.0, atualiza_pedidos)
+    t.start()   
 
 label_atendimento_ocor = tk.Label(aba3, text="Atendimento", fg="black").place(x=18,y=10)
 entrada_atendimento_ocor = tk.StringVar()
@@ -448,7 +603,11 @@ ent_tipo_ocor = ttk.Combobox(aba3,values=['Mau estado - Sem NF','Mau estado','Fa
 
 label_descricao_ocor = tk.Label(aba3, text="Descrição da ocorrência", fg="black").place(x=18,y=50)
 entrada_descricao_ocor = StringVar()
-ent_descricao_ocor = tk.Entry(aba3,fg="black", width=100).place(x=18,y=70)
+ent_descricao_ocor = tk.Entry(aba3,fg="black", width=100, textvariable = entrada_descricao_ocor).place(x=18,y=70)
+
+var_criar_card = tk.IntVar()
+cb_criar_card_ocor = tk.Radiobutton(aba3,text="Criar Card", variable=var_criar_card, value=1).place(x=380,y=15)
+cb_nao_criar_card = tk.Radiobutton(aba3,text="Não criar Card", variable=var_criar_card, value=0).place(x=380,y=35)
 
 botao_ok_ocor = tk.Button(aba3, text='Criar Ocorrência', width=12, command=inserir_ocorrencia ).place(x=200,y=100)
 botao_limpar_ocor = tk.Button(aba3, text='Limpar', width=12 ).place(x=300,y=100)
@@ -669,7 +828,7 @@ acompanhamento_cf.place(height=180, width=500,x=80, y=200)
 var_label_consulta_frete = StringVar()
 label_atualizacao_consulta_frete = tk.Label(aba4, text='Programar_atualização').place(x=8,y=600)
 
-t = threading.Timer(1.0, atualiza_pedidos)
+t = threading.Timer(1.0, atualiza_card_ocorrencia)
 t.start()
 
 janela.mainloop()
