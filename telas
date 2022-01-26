@@ -479,7 +479,8 @@ def inserir_ocorrencia():
                                         SA4.A4_NOME AS Transportadora,\
                                         SE1.E1_NOMCLI AS Marketplace,\
                                         SA1.A1_BAIRRO,\
-                                        SA1.A1_CEP\
+                                        SA1.A1_CEP,\
+                                        MKT.DATA_ACOMPANHAMENTO_ENTREGA\
                                         FROM SUA010 SUA  \
                                         LEFT JOIN SL1010 SL1 ON SL1.D_E_L_E_T_ = '' AND SL1.L1_FILIAL = SUA.UA_FILIAL AND SL1.L1_NUMATEN = SUA.UA_NUM \
                                         LEFT JOIN SA1010 SA1 ON SA1.D_E_L_E_T_ = '' AND SA1.A1_COD = SUA.UA_CLIENTE\
@@ -492,16 +493,16 @@ def inserir_ocorrencia():
                                         LEFT JOIN SA4010 SA4 ON SA4.D_E_L_E_T_ = '' AND SA4.A4_COD = SUA.UA_TRANSP \
                                         LEFT JOIN SB1010 SB1 ON SB1.D_E_L_E_T_ = '' AND SB1.B1_COD = SUB.UB_PRODUTO \
                                         WHERE 1=1 AND SUA.D_E_L_E_T_ = '' AND SUA.UA_VEND = '000099' AND SUA.UA_NUM = '"+entrada_atendimento_ocor2+"'\
-                                        GROUP BY SUA.UA_NUM, SUA.UA_CLIENTE, SA1.A1_NOME, SA1.A1_CGC,SA1.A1_EST,SA1.A1_MUN, SA1.A1_END, SA1.A1_DDD, SA1.A1_TEL, SA1.A1_EMAIL, SL1.L1_DOC,SUB.UB_PRODUTO, SUB.UB_ZDESC,SA4.A4_NOME,SE1.E1_NOMCLI,SA1.A1_END,SA1.A1_DDD,SA1.A1_TEL,SA1.A1_EMAIL,SA1.A1_BAIRRO,SA1.A1_CEP"
+                                        GROUP BY SUA.UA_NUM, SUA.UA_CLIENTE, SA1.A1_NOME, SA1.A1_CGC,SA1.A1_EST,SA1.A1_MUN, SA1.A1_END, SA1.A1_DDD, SA1.A1_TEL, SA1.A1_EMAIL, SL1.L1_DOC,SUB.UB_PRODUTO, SUB.UB_ZDESC,SA4.A4_NOME,SE1.E1_NOMCLI,SA1.A1_END,SA1.A1_DDD,SA1.A1_TEL,SA1.A1_EMAIL,SA1.A1_BAIRRO,SA1.A1_CEP,MKT.DATA_ACOMPANHAMENTO_ENTREGA"
             
             select_atendimento_ocor = pd.read_sql(select_atendimento_ocor, conn)
             nf_ocor = select_atendimento_ocor.iloc[0,10]
             cpf_cnpj_ocor = select_atendimento_ocor.iloc[0,3]
             cod_cliente_ocor = select_atendimento_ocor.iloc[0,1]
-            nome_cliente_ocor = select_atendimento_ocor.iloc[0,2]
-            rua = select_atendimento_ocor.iloc[0,6]
-            bairro = select_atendimento_ocor.iloc[0,15]
-            municipio = select_atendimento_ocor.iloc[0,5]
+            nome_cliente_ocor = str(select_atendimento_ocor.iloc[0,2]).title()
+            rua = str(select_atendimento_ocor.iloc[0,6]).title()
+            bairro = str(select_atendimento_ocor.iloc[0,15]).title()
+            municipio = str(select_atendimento_ocor.iloc[0,5]).title()
             estado = select_atendimento_ocor.iloc[0,4]
             endereco_ocor = rua +"-"+ bairro +"-"+ municipio +"-"+ estado
             cep_ocor = select_atendimento_ocor.iloc[0,16]
@@ -510,9 +511,33 @@ def inserir_ocorrencia():
             telefone_ocor = "("+ddd_ocor+")"+telefone1_ocor
             email_ocor = select_atendimento_ocor.iloc[0,9]
             cod_produto_ocor = select_atendimento_ocor.iloc[0,11]
-            produto_ocor = select_atendimento_ocor.iloc[0,12]
+            produto_ocor = str(select_atendimento_ocor.iloc[0,12]).title()
+            data_acompanhamento_entrega_ocor = select_atendimento_ocor.iloc[0,16]
             transportadora_ocor = select_atendimento_ocor.iloc[0,13]
+
+            if 'BRASPRESS'  in transportadora_ocor:
+                transportadora_ocor = 'Braspress'
+            if 'CORREIOS' in transportadora_ocor:
+                transportadora_ocor = 'Correios'
+            if 'TRANS EXPRESS' in transportadora_ocor:
+                transportadora_ocor = 'Trans Express'
+            if 'RODONAVES' in transportadora_ocor:
+                transportadora_ocor = 'Rodonaves'
+            
             marketplace_ocor = select_atendimento_ocor.iloc[0,14]
+            
+            if 'B2W' in marketplace_ocor:
+                marketplace_ocor = 'Americanas'
+            if 'AMAZON' in marketplace_ocor:
+                marketplace_ocor = 'Amazon'
+            if 'ML' in marketplace_ocor:
+                marketplace_ocor = 'Mercado Livre'
+            if 'MAGALU' in marketplace_ocor:
+                marketplace_ocor = 'Magalu'
+            if 'MM' in marketplace_ocor:
+                marketplace_ocor = 'MadeiraMadeira'
+            if 'VIA' in marketplace_ocor:
+                marketplace_ocor = 'Via Varejo'
 
             payload_pipefy_create_card = {"query":"mutation {createCard(input:\
                 {pipe_id:302216104, phase_id:314130855 title:\""+entrada_atendimento_ocor2+"\"\
@@ -530,6 +555,8 @@ def inserir_ocorrencia():
                 {field_id:\"tipo_da_ocorr_ncia\", field_value:\""+entrada_tipo_ocor2+"\"},\
                 {field_id:\"descri_o_da_ocorr_ncia\", field_value:\""+entrada_descricao_ocor2+"\"},\
                 {field_id:\"transportadora\", field_value:\""+transportadora_ocor+"\"},\
+                {field_id:\"status_do_chamado_aguardando_pe_a\", field_value:\"0\"},\
+                {field_id:\"data_da_entrega\", field_value:\""+data_acompanhamento_entrega_ocor+"\"},\
                 {field_id:\"marketplace\", field_value:\""+marketplace_ocor+"\"}]}){card{id title}}}"}
             
             headers_pipefy = {
@@ -567,16 +594,22 @@ def inserir_ocorrencia():
         entrada_tipo_ocor.set('')
         entrada_descricao_ocor.set('')
         
-    
-def atualiza_card_ocorrencia():
-    select_ocorrencias_ocor = "SELECT ATENDIMENTO FROM ZMARKETPLACE_OCORRENCIAS WHERE RESOLUCAO_OCORRENCIA <> 'Resolvido' OR RESOLUCAO_OCORRENCIA IS NULL"
-    select_ocorrencias_ocor = pd.read_sql(select_ocorrencias_ocor,conn)
-    atendimentos = select_ocorrencias_ocor['ATENDIMENTO'].to_numpy().tolist()
+df_ocorrencias = []
 
+def atualiza_card_ocorrencia():
+    select_ocorrencias_ocor = "SELECT ATENDIMENTO, RESOLUCAO_OCORRENCIA FROM ZMARKETPLACE_OCORRENCIAS" # WHERE RESOLUCAO_OCORRENCIA <> 'Resolvido' OR RESOLUCAO_OCORRENCIA IS NULL"
+    select_ocorrencias_ocor = pd.read_sql(select_ocorrencias_ocor,conn)
+    print(select_ocorrencias_ocor)
+    atendimentos = select_ocorrencias_ocor['ATENDIMENTO'].to_numpy().tolist()
+    ocorrencias1 = []
+    ocorrencias = pd.DataFrame()
+    linha_ocorrencias = 0
+    
     for atendimento in atendimentos:
+        atendimento = str(atendimento)
         url_pipefy = "https://api.pipefy.com/graphql"
 
-        payload_card_pipefy = {"query": "{cards(pipe_id:301530575, search:{title:\""+atendimento+"\"}) {  edges {  node{ id title current_phase {id name} fields {name report_value updated_at value}}}}}"}
+        payload_card_pipefy = {"query": "{cards(pipe_id:302216104, search:{title:\""+atendimento+"\"}) {  edges {  node{ id title current_phase {id name} fields {name report_value updated_at value}}}}}"}
         headers_pipefy = {
             "Accept": "application/json",
             "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJ1c2VyIjp7ImlkIjo5NjExMjYsImVtYWlsIjoibWFya2V0aW5nQHphbm90dGlyZWZyaWdlcmFjYW8uY29tLmJyIiwiYXBwbGljYXRpb24iOjMwMDEzNDkxM319.VIgfDCDN7Vb_HpBbBCqNi0cyoJT5AeDU_tT5OhZv6IBbkqRYTMYyfhFobu4d7KrSAYGRN7BKDlT2Ls_rO5ZK2A",
@@ -585,11 +618,42 @@ def atualiza_card_ocorrencia():
         response_card_pipefy = requests.request("POST", url_pipefy, json=payload_card_pipefy, headers=headers_pipefy)
         df_card_pipefy = json.loads(response_card_pipefy.content)
         df_card_pipefy = pd.DataFrame(df_card_pipefy)
-        card = df_card_pipefy.iloc[0,0]
-        card = pd.DataFrame(card)
-        id_card = ''
-    
+        df_card_pipefy = df_card_pipefy.iloc[0,0]
+        df_card_pipefy = pd.DataFrame(df_card_pipefy)
+        df_card_pipefy = df_card_pipefy.iloc[0,0]
+        df_card_pipefy = pd.DataFrame(df_card_pipefy)
+        fase_pipe_sac =  df_card_pipefy.iloc[0,0]
+        fase_pipe_sac = str(fase_pipe_sac['name'])
+        df_card_pipefy = df_card_pipefy.iloc[1,0]
+        df_card_pipefy = pd.DataFrame(df_card_pipefy)
+        nf_atualiza_ocor = df_card_pipefy.iloc[1,1]
+        produto_atualiza_ocor = str(df_card_pipefy.iloc[11,1]).title()
+        cliente_atualiza_ocor = str(df_card_pipefy.iloc[4,1]).title()
+        data_entrega_atualiza_ocor = df_card_pipefy.iloc[0,1]
+        ocorrencia_atualiza_ocor = df_card_pipefy.iloc[12,1]
+        atualizacao_ocorrencia = df_card_pipefy.iloc[0,1]
 
+        if atualizacao_ocorrencia == '0':  
+            atualizacao_ocorrencia = ''
+        
+        if atendimento not in df_ocorrencias and fase_pipe_sac != 'Concluídos':
+            ocorrencias1 = [nf_atualiza_ocor,produto_atualiza_ocor,cliente_atualiza_ocor,data_entrega_atualiza_ocor,ocorrencia_atualiza_ocor,atualizacao_ocorrencia]                                                    
+            acompanhamento_ocorrencias.insert('','end',values = ocorrencias1)
+            df_ocorrencias.append(atendimento)
+        
+        
+        print(select_ocorrencias_ocor)
+        status_ocorrencia = select_ocorrencias_ocor['ATENDIMENTO']== atendimento
+        print(atendimento)
+        print(status_ocorrencia)
+        
+        #if atendimento in df_ocorrencias and
+
+        if fase_pipe_sac == 'Concluídos':
+            update_ocorrencia = "UPDATE ZMARKETPLACE_OCORRENCIAS SET RESOLUCAO_OCORRENCIA = 'Resolvido' WHERE ATENDIMENTO = '"+atendimento+"'"
+            cursor.execute(update_ocorrencia)
+            conn.commit()
+        
     t = threading.Timer(1.0, atualiza_pedidos)
     t.start()   
 
@@ -832,3 +896,4 @@ t = threading.Timer(1.0, atualiza_card_ocorrencia)
 t.start()
 
 janela.mainloop()
+
