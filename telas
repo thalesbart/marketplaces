@@ -1,5 +1,6 @@
 from os import replace
 import tkinter
+import urllib
 from pandas.core.reshape.concat import concat
 import requests
 import pandas as pd
@@ -17,6 +18,7 @@ from datetime import datetime, timedelta
 import threading
 import time
 from tkinter import Text, filedialog
+from pathlib import Path
 import shutil
 
 server = '192.168.1.15' 
@@ -424,10 +426,9 @@ def inserir_ocorrencia():
 
     if var_criar_card.get() == 1:
         entrada_pdf_nf_ocor = str(var_pdf_nf_ocor.get())
-        destino_pdf_nf_ocor='\d\d192.168.1.16\d02 - Público\d09 - Marketing\dMarketplaces\dnfs_ocor'
+        destino_pdf_nf_ocor='//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/nfs_ocor'
         shutil.copy(entrada_pdf_nf_ocor, destino_pdf_nf_ocor)
         
-
         ok_cancelar = messagebox.askokcancel("Atenção", "Você deseja mesmo Criar o Card?")
         entrada_atendimento_ocor2 = str(entrada_atendimento_ocor.get())
         entrada_tipo_ocor2 = str(entrada_tipo_ocor.get())
@@ -500,27 +501,26 @@ def inserir_ocorrencia():
                                         GROUP BY SUA.UA_NUM, SUA.UA_CLIENTE, SA1.A1_NOME, SA1.A1_CGC,SA1.A1_EST,SA1.A1_MUN, SA1.A1_END, SA1.A1_DDD, SA1.A1_TEL, SA1.A1_EMAIL, SL1.L1_DOC,SUB.UB_PRODUTO, SUB.UB_ZDESC,SA4.A4_NOME,SE1.E1_NOMCLI,SA1.A1_END,SA1.A1_DDD,SA1.A1_TEL,SA1.A1_EMAIL,SA1.A1_BAIRRO,SA1.A1_CEP,MKT.DATA_ACOMPANHAMENTO_ENTREGA"
             
             select_atendimento_ocor = pd.read_sql(select_atendimento_ocor, conn)
-            nf_ocor = select_atendimento_ocor.iloc[0,10]
-            cpf_cnpj_ocor = select_atendimento_ocor.iloc[0,3]
-            cod_cliente_ocor = select_atendimento_ocor.iloc[0,1]
+            nf_ocor = str(select_atendimento_ocor.iloc[0,10])
+            cpf_cnpj_ocor = str(select_atendimento_ocor.iloc[0,3])
+            cod_cliente_ocor = str(select_atendimento_ocor.iloc[0,1])
             nome_cliente_ocor = str(select_atendimento_ocor.iloc[0,2]).title()
             rua = str(select_atendimento_ocor.iloc[0,6]).title()
             bairro = str(select_atendimento_ocor.iloc[0,15]).title()
             municipio = str(select_atendimento_ocor.iloc[0,5]).title()
-            estado = select_atendimento_ocor.iloc[0,4]
+            estado = str(select_atendimento_ocor.iloc[0,4])
             endereco_ocor = rua + bairro +"-"+ municipio +"-"+ estado
-            cep_ocor = select_atendimento_ocor.iloc[0,16]
-            telefone1_ocor = select_atendimento_ocor.iloc[0,8]
-            ddd_ocor = select_atendimento_ocor.iloc[0,7]
+            cep_ocor = str(select_atendimento_ocor.iloc[0,16])
+            telefone1_ocor = str(select_atendimento_ocor.iloc[0,8])
+            ddd_ocor = str(select_atendimento_ocor.iloc[0,7])
             telefone_ocor = "("+ddd_ocor+")"+telefone1_ocor
-            email_ocor = select_atendimento_ocor.iloc[0,9]
-            cod_produto_ocor = select_atendimento_ocor.iloc[0,11]
+            email_ocor = str(select_atendimento_ocor.iloc[0,9])
+            cod_produto_ocor = str(select_atendimento_ocor.iloc[0,11])
             produto_ocor = str(select_atendimento_ocor.iloc[0,12]).title()
-            data_acompanhamento_entrega_ocor = select_atendimento_ocor.iloc[0,17]
-            transportadora_ocor = select_atendimento_ocor.iloc[0,13]
-            caminho_nf_ocor = destino_pdf_nf_ocor+"\d"+nf_ocor+".pdf"
-            print(caminho_nf_ocor)
-
+            data_acompanhamento_entrega_ocor = str(select_atendimento_ocor.iloc[0,17])
+            transportadora_ocor = str(select_atendimento_ocor.iloc[0,13])
+            caminho_nf_ocor = "file:"+destino_pdf_nf_ocor+"/"+nf_ocor+".pdf"
+            
             if 'BRASPRESS'  in transportadora_ocor:
                 transportadora_ocor = 'Braspress'
             if 'CORREIOS' in transportadora_ocor:
@@ -545,40 +545,39 @@ def inserir_ocorrencia():
             if 'CNOVA' in marketplace_ocor:
                 marketplace_ocor = 'Via Varejo'
 
-            print(nf_ocor, produto_ocor, nome_cliente_ocor, cep_ocor, data_acompanhamento_entrega_ocor)
-            payload_pipefy_create_card = {"query":"mutation {createCard(input:\
-                {pipe_id:302216104, phase_id:314130855 title:\""+entrada_atendimento_ocor2+"\"\
-                fields_attributes:[{field_id:\"n_mero_da_nota_fiscal_emitida_pela_zanotti\", field_value:\""+nf_ocor+"\"},\
-                {field_id:\"cpf_cnpj\", field_value:\""+cpf_cnpj_ocor+"\"},\
-                {field_id:\"c_digo_do_cliente\", field_value:\""+cod_cliente_ocor+"\"},\
-                {field_id:\"raz_o_social\", field_value:\""+nome_cliente_ocor+"\"},\
-                {field_id:\"atendimento\", field_value:\""+entrada_atendimento_ocor2+"\"},\
-                {field_id: \"rua_n_mero\", field_value:\""+endereco_ocor+"\"},\
-                {field_id:\"cep\", field_value:\""+cep_ocor+"\"},\
-                {field_id:\"telefone\", field_value:\""+telefone_ocor+"\"},\
-                {field_id:\"email\", field_value:\""+email_ocor+"\"},\
-                {field_id:\"descri_o_do_produto\", field_value:\""+cod_produto_ocor+"\"},\
-                {field_id: \"produto\", field_value:\""+produto_ocor+"\"},\
-                {field_id:\"tipo_da_ocorr_ncia\", field_value:\""+entrada_tipo_ocor2+"\"},\
-                {field_id:\"descri_o_da_ocorr_ncia\", field_value:\""+entrada_descricao_ocor2+"\"},\
-                {field_id:\"transportadora\", field_value:\""+transportadora_ocor+"\"},\
-                {field_id:\"status_do_chamado_aguardando_pe_a\", field_value:\"0\"},\
-                {field_id:\"data_da_entrega\", field_value:\""+data_acompanhamento_entrega_ocor+"\"},\
-                {field_id:\"caminho_da_nf\", field_value:\""+caminho_nf_ocor+"\"},\
-                {field_id:\"marketplace\", field_value:\""+marketplace_ocor+"\"}]}){card{id title}}}"}
-            
-            headers_pipefy = {
-            "Accept": "application/json",
-            "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJ1c2VyIjp7ImlkIjo5NjExMjYsImVtYWlsIjoibWFya2V0aW5nQHphbm90dGlyZWZyaWdlcmFjYW8uY29tLmJyIiwiYXBwbGljYXRpb24iOjMwMDEzNDkxM319.VIgfDCDN7Vb_HpBbBCqNi0cyoJT5AeDU_tT5OhZv6IBbkqRYTMYyfhFobu4d7KrSAYGRN7BKDlT2Ls_rO5ZK2A",
-            "Content-Type": "application/json"
-        }
-            response_pipefy_create_card = requests.request("POST", url_pipefy, json = payload_pipefy_create_card, headers = headers_pipefy)
-            df_pipefy_create_card = json.loads(response_pipefy_create_card.content)
-            messagebox.showinfo("Tudo certo!", "Card criado com sucesso!")
-        else:
-            messagebox.showinfo("Atenção", "Verifique junto ao SAC, pois essa Ocorrência já existe!")
- 
+            if ' ' not in nf_ocor:
 
+                payload_pipefy_create_card = {"query":"mutation {createCard(input:\
+                    {pipe_id:302216104, phase_id:314130855 title:\""+entrada_atendimento_ocor2+"\"\
+                    fields_attributes:[{field_id:\"n_mero_da_nota_fiscal_emitida_pela_zanotti\", field_value:\""+nf_ocor+"\"},\
+                    {field_id:\"cpf_cnpj\", field_value:\""+cpf_cnpj_ocor+"\"},\
+                    {field_id:\"c_digo_do_cliente\", field_value:\""+cod_cliente_ocor+"\"},\
+                    {field_id:\"raz_o_social\", field_value:\""+nome_cliente_ocor+"\"},\
+                    {field_id:\"atendimento\", field_value:\""+entrada_atendimento_ocor2+"\"},\
+                    {field_id: \"rua_n_mero\", field_value:\""+endereco_ocor+"\"},\
+                    {field_id:\"cep\", field_value:\""+cep_ocor+"\"},\
+                    {field_id:\"telefone\", field_value:\""+telefone_ocor+"\"},\
+                    {field_id:\"email\", field_value:\""+email_ocor+"\"},\
+                    {field_id:\"descri_o_do_produto\", field_value:\""+cod_produto_ocor+"\"},\
+                    {field_id: \"produto\", field_value:\""+produto_ocor+"\"},\
+                    {field_id:\"tipo_da_ocorr_ncia\", field_value:\""+entrada_tipo_ocor2+"\"},\
+                    {field_id:\"descri_o_da_ocorr_ncia\", field_value:\""+entrada_descricao_ocor2+"\"},\
+                    {field_id:\"transportadora\", field_value:\""+transportadora_ocor+"\"},\
+                    {field_id:\"status_do_chamado_aguardando_pe_a\", field_value:\"0\"},\
+                    {field_id:\"data_da_entrega\", field_value:\""+data_acompanhamento_entrega_ocor+"\"},\
+                    {field_id:\"caminho_da_nota_fiscal\", field_value:\""+caminho_nf_ocor+"\"},\
+                    {field_id:\"marketplace\", field_value:\""+marketplace_ocor+"\"}]}){card{id title}}}"}              
+
+                response_pipefy_create_card = requests.request("POST", url_pipefy, json = payload_pipefy_create_card, headers = headers_pipefy)
+                df_pipefy_create_card = json.loads(response_pipefy_create_card.content)
+                df_pipefy_create_card = df_pipefy_create_card['data']
+                df_pipefy_create_card = df_pipefy_create_card['createCard']
+                df_pipefy_create_card = df_pipefy_create_card['card']
+                id_card_criado = df_pipefy_create_card['id']
+
+                messagebox.showinfo("Tudo certo!", "Card "+id_card_criado+" criado com sucesso!")
+            else:
+                messagebox.showinfo("Atenção", "Verifique junto ao SAC, pois essa Ocorrência já existe!")
     else:
         ok_cancelar = messagebox.askokcancel("Atenção", "Você deseja mesmo inserir a Ocorrência sem Criar o Card?")
         entrada_atendimento_ocor2 = str(entrada_atendimento_ocor.get())
@@ -727,6 +726,75 @@ cb_nao_criar_card = tk.Radiobutton(aba3,text="Não criar Card", variable=var_cri
 botao_ok_ocor = tk.Button(aba3, text='Criar Ocorrência', width=12, command=inserir_ocorrencia ).place(x=200,y=100)
 botao_limpar_ocor = tk.Button(aba3, text='Limpar', width=12 ).place(x=300,y=100)
 
+def selecionar_item(event):
+
+    selected_item = acompanhamento_ocorrencias.focus()
+    item_selecionado = acompanhamento_ocorrencias.item(selected_item)
+    nf_item_selecionado = item_selecionado['values'][0]
+    
+    select_mostrar_dados_item_selecionado = "SELECT\
+                                            SUA.UA_NUM AS Atendimento,\
+                                            SL1.L1_DOC AS NF,\
+                                            SL1.L1_EMISNF AS Data_Emissao_NF,\
+                                            (SL1.L1_VALMERC - SUA.UA_DESCONT)  AS Valor_NF,\
+                                            SUA.UA_CLIENTE AS Cod_Cliente,\
+                                            SA1.A1_NOME AS Cliente,\
+                                            SUB.UB_PRODUTO AS Cod_Produto, \
+                                            SUB.UB_ZDESC AS Produto,\
+                                            SE1.E1_NOMCLI AS Marketplace,\
+                                            SA4.A4_NOME AS Transportadora,\
+                                            MKTO.RESOLUCAO_OCORRENCIA,\
+                                            MKTO.DESCRICAO_RESOLUCAO_ENTREGA\
+                                            FROM SUA010 SUA\
+                                            LEFT JOIN SL1010 SL1 ON SL1.D_E_L_E_T_ = '' AND SL1.L1_FILIAL = SUA.UA_FILIAL AND SL1.L1_NUMATEN = SUA.UA_NUM \
+                                            LEFT JOIN SA1010 SA1 ON SA1.D_E_L_E_T_ = '' AND SA1.A1_COD = SUA.UA_CLIENTE\
+                                            LEFT JOIN SUB010 SUB ON SUB.D_E_L_E_T_ = '' AND SUB.UB_NUM = SUA.UA_NUM \
+                                            LEFT JOIN SA4010 SA4 ON SA4.D_E_L_E_T_ = '' AND SA4.A4_COD = SUA.UA_TRANSP \
+                                            LEFT JOIN SE1010 SE1 ON SE1.D_E_L_E_T_ = '' AND SE1.E1_NUM = SL1.L1_DOC\
+                                            LEFT JOIN ZMARKETPLACE_OCORRENCIAS MKTO ON MKTO.ATENDIMENTO = SUA.UA_NUM\
+                                            WHERE 1=1 AND SUA.D_E_L_E_T = '' AND SUA.UA_VEND = '000099' AND SL1.L1_DOC ="+nf_item_selecionado+\
+                                            "GROUP BY SUA.UA_NUM, SL1.L1_DOC, SL1.L1_EMISNF, SL1.L1_VALMERC, SUA.UA_DESCONT,SUA.UA_CLIENTE,SA1.A1_NOME,SUB.UB_PRODUTO, SUB.UB_ZDESC,SE1.E1_NOMCLI,SA4.A4_NOME,MKTO.RESOLUCAO_OCORRENCIA,MKTO.DESCRICAO_RESOLUCAO_ENTREGA"
+
+    url_pipefy = "https://api.pipefy.com/graphql"
+
+    payload_card_pipefy = {"query": "{cards(pipe_id:302216104, search:{title:\""+atendimento+"\"}) {  edges {  node{ id title current_phase {id name} fields {name report_value updated_at value}}}}}"}
+    headers_pipefy = {
+            "Accept": "application/json",
+            "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJ1c2VyIjp7ImlkIjo5NjExMjYsImVtYWlsIjoibWFya2V0aW5nQHphbm90dGlyZWZyaWdlcmFjYW8uY29tLmJyIiwiYXBwbGljYXRpb24iOjMwMDEzNDkxM319.VIgfDCDN7Vb_HpBbBCqNi0cyoJT5AeDU_tT5OhZv6IBbkqRYTMYyfhFobu4d7KrSAYGRN7BKDlT2Ls_rO5ZK2A",
+            "Content-Type": "application/json"
+        }
+    response_card_pipefy = requests.request("POST", url_pipefy, json=payload_card_pipefy, headers=headers_pipefy)
+    df_card_pipefy = json.loads(response_card_pipefy.content)
+    card_no_pipefy = df_card_pipefy['data']
+    card_no_pipefy = card_no_pipefy['cards']
+    card_no_pipefy = card_no_pipefy['edges']
+'''
+    if card_no_pipefy != []:
+        df_card_pipefy = pd.DataFrame(df_card_pipefy)
+        df_card_pipefy = df_card_pipefy.iloc[0,0]
+        df_card_pipefy = pd.DataFrame(df_card_pipefy)
+        df_card_pipefy = df_card_pipefy.iloc[0,0]
+        df_card_pipefy = pd.DataFrame(df_card_pipefy)
+        fase_pipe_sac =  df_card_pipefy.iloc[0,0]
+        fase_pipe_sac = str(fase_pipe_sac['name'])
+        df_card_pipefy = df_card_pipefy.iloc[1,0]
+        df_card_pipefy = pd.DataFrame(df_card_pipefy)            
+        df_card_pipefy =df_card_pipefy.set_index('name')
+        nf_atualiza_ocor = df_card_pipefy.loc['Nota Fiscal']
+        nf_atualiza_ocor = str(nf_atualiza_ocor.loc['value'])
+        produto_atualiza_ocor = df_card_pipefy.loc['Produto']
+        produto_atualiza_ocor = str(produto_atualiza_ocor.loc['value']).title()
+        cliente_atualiza_ocor = df_card_pipefy.loc['Nome']
+        cliente_atualiza_ocor = str(cliente_atualiza_ocor.loc['value']).title()
+        data_entrega_atualiza_ocor = df_card_pipefy.loc['Data da Entrega']
+        data_entrega_atualiza_ocor = str(data_entrega_atualiza_ocor.loc['value'])
+        ocorrencia_atualiza_ocor = df_card_pipefy.loc['Tipo da Ocorrência']
+        ocorrencia_atualiza_ocor = str(ocorrencia_atualiza_ocor.loc['value'])
+        atualizacao_ocorrencia = df_card_pipefy.loc['Atualização da Ocorrência']
+        atualizacao_ocorrencia = str(atualizacao_ocorrencia.loc['value'])
+'''
+
+
 acompanhamento_ocorrencias = ttk.Treeview(aba3, selectmode="browse", column=('nf','produto','cliente','data_ult_acompanhamento','tipo_ocorrencia'),show ='headings')
 acompanhamento_ocorrencias.column('nf',width=90, minwidth=50, stretch=NO)
 acompanhamento_ocorrencias.heading('#1', text='NF')
@@ -739,6 +807,7 @@ acompanhamento_ocorrencias.heading('#4', text='Data Entrega')
 acompanhamento_ocorrencias.column('tipo_ocorrencia',width=110, minwidth=50, stretch=NO)
 acompanhamento_ocorrencias.heading('#5', text='Ocorrência')
 acompanhamento_ocorrencias.place(height=200, width=700,x=0, y=140)
+acompanhamento_ocorrencias.bind("<<TreeviewSelect>>",selecionar_item)
 
 lbl_atd_ocor = tk.Label(aba3, text="Atendimento", fg="black").place(x=10,y=340)
 var_atd_ocor = StringVar()
