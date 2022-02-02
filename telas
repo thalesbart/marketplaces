@@ -1,5 +1,6 @@
 from os import replace
 import tkinter
+from typing_extensions import Annotated
 import urllib
 from pandas.core.reshape.concat import concat
 import requests
@@ -329,6 +330,7 @@ def atualiza_pedidos():
         var_label_novos_pedidos.set('Pedidos atualizados - última atualização em '+ data_atualizacao)
         print(data_atualizacao)
 
+    print('fim atualiza pedido')
     t = threading.Timer(10.0, atualiza_card_ocorrencia)
     t.start()
 
@@ -694,6 +696,10 @@ def atualiza_card_ocorrencia():
                 cursor.execute(update_ocorrencia)
                 conn.commit()
         linha_ocorrencias = linha_ocorrencias + 1
+
+
+    #reabrir e taguear card logistica qndo fase sac = solicitação de reversa
+    print('fim atualiza ocorrencia')
     t = threading.Timer(1.0, atualiza_pedidos)
     t.start()   
 
@@ -727,37 +733,97 @@ botao_ok_ocor = tk.Button(aba3, text='Criar Ocorrência', width=12, command=inse
 botao_limpar_ocor = tk.Button(aba3, text='Limpar', width=12 ).place(x=300,y=100)
 
 def selecionar_item(event):
-
     selected_item = acompanhamento_ocorrencias.focus()
     item_selecionado = acompanhamento_ocorrencias.item(selected_item)
     nf_item_selecionado = item_selecionado['values'][0]
+    nf_item_selecionado = str(nf_item_selecionado)
     
-    select_mostrar_dados_item_selecionado = "SELECT\
+    select_mostrar_dados_item_selecionado="SELECT\
                                             SUA.UA_NUM AS Atendimento,\
-                                            SL1.L1_DOC AS NF,\
-                                            SL1.L1_EMISNF AS Data_Emissao_NF,\
-                                            (SL1.L1_VALMERC - SUA.UA_DESCONT)  AS Valor_NF,\
                                             SUA.UA_CLIENTE AS Cod_Cliente,\
                                             SA1.A1_NOME AS Cliente,\
-                                            SUB.UB_PRODUTO AS Cod_Produto, \
+                                            SL1.L1_DOC AS NF,\
+                                            SL1.L1_EMISSAO,\
+                                            (SL1.L1_VALMERC - SUA.UA_DESCONT)  AS Valor_NF,\
+                                            SUB.UB_PRODUTO AS Cod_Produto,\
                                             SUB.UB_ZDESC AS Produto,\
-                                            SE1.E1_NOMCLI AS Marketplace,\
                                             SA4.A4_NOME AS Transportadora,\
-                                            MKTO.RESOLUCAO_OCORRENCIA,\
-                                            MKTO.DESCRICAO_RESOLUCAO_ENTREGA\
-                                            FROM SUA010 SUA\
+                                            SE1.E1_NOMCLI AS Marketplace,\
+                                            MKTO.TIPO_OCORRENCIA,\
+                                            CAST(MKTO.DESCRICAO_RESOLUCAO_OCORRENCIA AS VARCHAR(1000))AS descricao_resolucao_ocorrencia,\
+                                            MKTO.RESOLUCAO_OCORRENCIA\
+                                            FROM SUA010 SUA  \
                                             LEFT JOIN SL1010 SL1 ON SL1.D_E_L_E_T_ = '' AND SL1.L1_FILIAL = SUA.UA_FILIAL AND SL1.L1_NUMATEN = SUA.UA_NUM \
                                             LEFT JOIN SA1010 SA1 ON SA1.D_E_L_E_T_ = '' AND SA1.A1_COD = SUA.UA_CLIENTE\
+                                            LEFT JOIN SL4010 SL4 ON SL4.D_E_L_E_T_ = '' AND SL4.L4_DOC = SL1.L1_DOC\
+                                            LEFT JOIN SF2010 SF2 ON SF2.D_E_L_E_T_ = '' AND SF2.F2_DOC = SL1.L1_DOC\
                                             LEFT JOIN SUB010 SUB ON SUB.D_E_L_E_T_ = '' AND SUB.UB_NUM = SUA.UA_NUM \
-                                            LEFT JOIN SA4010 SA4 ON SA4.D_E_L_E_T_ = '' AND SA4.A4_COD = SUA.UA_TRANSP \
+                                            LEFT JOIN SL2010 SL2 ON SL2.D_E_L_E_T_ = '' AND SL2.L2_DOC = SL1.L1_DOC\
                                             LEFT JOIN SE1010 SE1 ON SE1.D_E_L_E_T_ = '' AND SE1.E1_NUM = SL1.L1_DOC\
+                                            LEFT JOIN SAE010 SAE ON SAE.D_E_L_E_T_ = '' AND SAE.AE_COD = SE1.E1_CLIENTE\
+                                            LEFT JOIN SA4010 SA4 ON SA4.D_E_L_E_T_ = '' AND SA4.A4_COD = SUA.UA_TRANSP \
+                                            LEFT JOIN SB1010 SB1 ON SB1.D_E_L_E_T_ = '' AND SB1.B1_COD = SUB.UB_PRODUTO\
+                                            LEFT JOIN ZMARKETPLACE MKT ON MKT.NF = SL1.L1_DOC\
                                             LEFT JOIN ZMARKETPLACE_OCORRENCIAS MKTO ON MKTO.ATENDIMENTO = SUA.UA_NUM\
-                                            WHERE 1=1 AND SUA.D_E_L_E_T = '' AND SUA.UA_VEND = '000099' AND SL1.L1_DOC ="+nf_item_selecionado+\
-                                            "GROUP BY SUA.UA_NUM, SL1.L1_DOC, SL1.L1_EMISNF, SL1.L1_VALMERC, SUA.UA_DESCONT,SUA.UA_CLIENTE,SA1.A1_NOME,SUB.UB_PRODUTO, SUB.UB_ZDESC,SE1.E1_NOMCLI,SA4.A4_NOME,MKTO.RESOLUCAO_OCORRENCIA,MKTO.DESCRICAO_RESOLUCAO_ENTREGA"
+                                            WHERE 1=1 AND SUA.D_E_L_E_T_ = '' AND SUA.UA_VEND = '000099' AND SL1.L1_DOC LIKE '%"+nf_item_selecionado+"'\
+                                            GROUP BY SUA.UA_NUM, SUA.UA_CLIENTE, SA1.A1_NOME, SA1.A1_CGC,SA1.A1_EST,SA1.A1_MUN, SA1.A1_END, SA1.A1_DDD, SA1.A1_TEL, SA1.A1_EMAIL, SL1.L1_DOC,SUB.UB_PRODUTO, SUB.UB_ZDESC,SA4.A4_NOME,SE1.E1_NOMCLI,SA1.A1_END,SA1.A1_DDD,SA1.A1_TEL,SA1.A1_EMAIL,SA1.A1_BAIRRO, SA1.A1_CEP, MKT.DATA_ACOMPANHAMENTO_ENTREGA, MKT.DATA_ACOMPANHAMENTO_ENTREGA,MKTO.TIPO_OCORRENCIA,CAST(MKTO.DESCRICAO_RESOLUCAO_OCORRENCIA AS VARCHAR(1000)),SL1.L1_EMISSAO,SL1.L1_VALMERC,SUA.UA_DESCONT,MKTO.RESOLUCAO_OCORRENCIA"
+    
+    select_mostrar_dados_item_selecionado = pd.read_sql(select_mostrar_dados_item_selecionado,conn)
+    atd_select_ocor = str(select_mostrar_dados_item_selecionado.iloc[0,0])
+    dt_emissao_select_ocor = str(select_mostrar_dados_item_selecionado.iloc[0,4])
+    ano_dt_emissao_select_ocor = dt_emissao_select_ocor [0:4]
+    mes_dt_emissao_select_ocor = dt_emissao_select_ocor [4:6]
+    dia_dt_emissao_select_ocor =dt_emissao_select_ocor [6:8]
+    dt_emissao_select_ocor = dia_dt_emissao_select_ocor+"/"+mes_dt_emissao_select_ocor+"/"+ano_dt_emissao_select_ocor
+    valor_nf_select_ocor = float(select_mostrar_dados_item_selecionado.iloc[0,5])
+    valor_nf_select_ocor = round(valor_nf_select_ocor,2)
+    valor_nf_select_ocor = "R$ "+str(valor_nf_select_ocor).replace(".",",")
+    cod_cliente_select_ocor = str(select_mostrar_dados_item_selecionado.iloc[0,1])
+    cliente_select_ocor = str(select_mostrar_dados_item_selecionado.iloc[0,2]).title()
+    cod_prod_select_ocor = str(select_mostrar_dados_item_selecionado.iloc[0,6])
+    produto_select_ocor = str(select_mostrar_dados_item_selecionado.iloc[0,7]).title()
+    transportadora_select_ocor = str(select_mostrar_dados_item_selecionado.iloc[0,8])
+    if 'BRASPRESS'  in transportadora_select_ocor:
+        transportadora_select_ocor = 'Braspress'
+    if 'CORREIOS' in transportadora_select_ocor:
+        transportadora_select_ocor = 'Correios'
+    if 'TRANS EXPRESS' in transportadora_select_ocor:
+        transportadora_select_ocor = 'Trans Express'
+    if 'RODONAVES' in transportadora_select_ocor:
+        transportadora_select_ocor = 'Rodonaves'           
+    marketplace_select_ocor = str(select_mostrar_dados_item_selecionado.iloc[0,9])            
+    if 'B2W' in marketplace_select_ocor:
+        marketplace_select_ocor = 'Americanas'
+    if 'AMAZON' in marketplace_select_ocor:
+        marketplace_select_ocor = 'Amazon'
+    if 'ML' in marketplace_select_ocor:
+        marketplace_select_ocor = 'Mercado Livre'
+    if 'MAGALU' in marketplace_select_ocor:
+        marketplace_select_ocor = 'Magalu'
+    if 'MM' in marketplace_select_ocor:
+        marketplace_select_ocor = 'MadeiraMadeira'
+    if 'CNOVA' in marketplace_select_ocor:
+        marketplace_select_ocor = 'Via Varejo'
+    status_select_ocor = str(select_mostrar_dados_item_selecionado.iloc[0,12])
+    atualizacao_select_ocor = str(select_mostrar_dados_item_selecionado.iloc[0,11])
 
+    var_atd_ocor.set(atd_select_ocor)
+    var_nf_ocor.set(nf_item_selecionado)
+    var_emissao_nf_ocor.set(dt_emissao_select_ocor)
+    var_valor_nf_ocor.set(valor_nf_select_ocor)
+    var_cod_cliente_ocor.set(cod_cliente_select_ocor)
+    var_cliente_ocor.set(cliente_select_ocor)
+    var_cod_prod_ocor.set(cod_prod_select_ocor)
+    var_produto_ocor.set(produto_select_ocor)
+    var_marketplace_ocor.set(marketplace_select_ocor)
+    var_transportadora_ocor.set(transportadora_select_ocor)
+    var_status_sac_ocor.set(status_select_ocor)
+    var_atualizacao_ocor.set(atualizacao_select_ocor)
+
+'''
     url_pipefy = "https://api.pipefy.com/graphql"
 
-    payload_card_pipefy = {"query": "{cards(pipe_id:302216104, search:{title:\""+atendimento+"\"}) {  edges {  node{ id title current_phase {id name} fields {name report_value updated_at value}}}}}"}
+    payload_card_pipefy = {"query": "{cards(pipe_id:302216104, search:{title:\""+atd_select_ocor+"\"}) {  edges {  node{ id title current_phase {id name} fields {name report_value updated_at value}}}}}"}
     headers_pipefy = {
             "Accept": "application/json",
             "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJ1c2VyIjp7ImlkIjo5NjExMjYsImVtYWlsIjoibWFya2V0aW5nQHphbm90dGlyZWZyaWdlcmFjYW8uY29tLmJyIiwiYXBwbGljYXRpb24iOjMwMDEzNDkxM319.VIgfDCDN7Vb_HpBbBCqNi0cyoJT5AeDU_tT5OhZv6IBbkqRYTMYyfhFobu4d7KrSAYGRN7BKDlT2Ls_rO5ZK2A",
@@ -768,7 +834,7 @@ def selecionar_item(event):
     card_no_pipefy = df_card_pipefy['data']
     card_no_pipefy = card_no_pipefy['cards']
     card_no_pipefy = card_no_pipefy['edges']
-'''
+
     if card_no_pipefy != []:
         df_card_pipefy = pd.DataFrame(df_card_pipefy)
         df_card_pipefy = df_card_pipefy.iloc[0,0]
@@ -793,7 +859,6 @@ def selecionar_item(event):
         atualizacao_ocorrencia = df_card_pipefy.loc['Atualização da Ocorrência']
         atualizacao_ocorrencia = str(atualizacao_ocorrencia.loc['value'])
 '''
-
 
 acompanhamento_ocorrencias = ttk.Treeview(aba3, selectmode="browse", column=('nf','produto','cliente','data_ult_acompanhamento','tipo_ocorrencia'),show ='headings')
 acompanhamento_ocorrencias.column('nf',width=90, minwidth=50, stretch=NO)
@@ -1016,3 +1081,4 @@ t = threading.Timer(1.0, atualiza_card_ocorrencia)
 t.start()
 
 janela.mainloop()
+
