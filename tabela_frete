@@ -1,0 +1,415 @@
+from datetime import datetime
+from numpy import append
+import pandas as pd
+import sys, os
+import pyodbc
+import requests
+from requests.models import ContentDecodingError
+import csv, json
+import time
+from requests.auth import HTTPBasicAuth
+from datetime import date, timedelta
+import math
+
+server = '192.168.1.15' 
+database = 'PROTHEUS_ZANOTTI_PRODUCAO' 
+username = 'totvs' 
+password = 'totvsip' 
+conn = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER='+server+';DATABASE='+database+';UID='+username+';PWD='+ password)
+cursor = conn.cursor()
+
+headers= {'Content-Type':'application/json'}
+url_autenticacao= "https://01wapi.rte.com.br/token"
+parametros= {'auth_type':'dev', 'grant_type':'password','username':'ZANOTTI', 'password':'7EPC6I8Z'}
+autenticacao = requests.request("POST", url_autenticacao, headers=headers, data=parametros)
+autenticacao=(autenticacao.text)
+autenticacao = "["+autenticacao+"]"
+autenticacao = pd.read_json(autenticacao)
+token = str(autenticacao.iloc[0,0])
+
+query_produtos = "SELECT \
+SB1.B1_COD,\
+SB1.B1_DESC,\
+(SB1.B1_CUSTD + (SB1.B1_CUSTD*0.45))AS Valor,\
+SB1.B1_PESBRU,\
+SB5.B5_LARG,\
+SB5.B5_ALTURA,\
+SB5.B5_COMPR \
+FROM SB1010 SB1 \
+LEFT JOIN SB5010 SB5 ON SB5.D_E_L_E_T_ = '' AND SB5.B5_COD = SB1.B1_COD \
+WHERE (SB1.B1_PESBRU >= 30 OR SB5.B5_ALTURA >=1 OR SB5.B5_COMPR >= 1 OR SB5.B5_LARG >= 1)  AND SB1.B1_ZMKTPLC = 'S'"
+
+produtos = pd.read_sql(query_produtos,conn)
+qtde_linhas_produtos= produtos['B1_COD'].count()
+
+dados_happening = pd.read_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Tabelas Frete/happening.xlsx')
+
+cidades_transexpress = pd.read_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Tabelas Frete/transexpress.xlsx')
+
+cpp_leofran = pd.read_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Tabelas Frete/leofran.xlsx')
+
+tabela_ceps= pd.read_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/tabela_frete_marketplaces/ceps.xlsx')
+qtde_linhas_ceps = tabela_ceps['CEP'].count()
+linha_produto = 0
+linha_ceps = 0
+perfil_produto = ''
+
+cnpjdestinatario = '40745577890'
+
+data_atual = date.today()
+time_delta = timedelta(1)
+data_atual2 = data_atual + time_delta
+data_atual2 = data_atual2.strftime("%d/%m/%Y")
+
+ceps_min_max_sp = pd.DataFrame(columns=['cidade','cep_min','cep_max'])
+ceps_min_max_rj = pd.DataFrame(columns=['cidade','cep_min','cep_max'])
+ceps_min_max_mg = pd.DataFrame(columns=['cidade','cep_min','cep_max'])
+ceps_min_max_es = pd.DataFrame(columns=['cidade','cep_min','cep_max'])
+
+ceps_sp = (tabela_ceps.loc[tabela_ceps['Estado']=='SP'])
+cidades_sp = ceps_sp['Cidade'].unique()
+cidades_sp = cidades_sp.tolist()
+linha_sp = 0
+
+for cidade_sp in cidades_sp:
+    dados_cidade_sp = ceps_sp.loc[ceps_sp['Cidade']==cidade_sp]
+    cep_max_cidade = dados_cidade_sp['CEP'].max()
+    cep_min_cidade = dados_cidade_sp['CEP'].min()
+    ceps_min_max_sp.loc[linha_sp] = [cidade_sp,cep_min_cidade,cep_max_cidade]
+    linha_sp = linha_sp + 1
+
+ceps_rj = tabela_ceps.loc[tabela_ceps['Estado']=='RJ']
+cidades_rj = ceps_rj['Cidade'].unique()
+cidades_rj = cidades_rj.tolist()
+linha_rj = 0
+
+for cidade_rj in cidades_rj:
+    dados_cidade_rj = ceps_rj.loc[ceps_rj['Cidade']==cidade_rj]
+    cep_max_cidade = dados_cidade_rj['CEP'].max()
+    cep_min_cidade = dados_cidade_rj['CEP'].min()
+    ceps_min_max_rj.loc[linha_rj] = [cidade_rj,cep_min_cidade,cep_max_cidade]
+    linha_rj = linha_rj + 1
+
+ceps_mg = tabela_ceps.loc[tabela_ceps['Estado']=='MG']
+cidades_mg = ceps_mg['Cidade'].unique()
+cidades_mg = cidades_mg.tolist()
+linha_mg = 0
+
+for cidade_mg in cidades_mg:
+    dados_cidade_mg = ceps_mg.loc[ceps_mg['Cidade']==cidade_mg]
+    cep_max_cidade = dados_cidade_mg['CEP'].max()
+    cep_min_cidade = dados_cidade_mg['CEP'].min()
+    ceps_min_max_mg.loc[linha_mg] = [cidade_mg,cep_min_cidade,cep_max_cidade]
+    linha_mg = linha_mg + 1
+
+ceps_es = tabela_ceps.loc[tabela_ceps['Estado']=='ES']
+cidades_es = ceps_es['Cidade'].unique()
+cidades_es = cidades_es.tolist()
+linha_es = 0
+
+for cidade_es in cidades_es:
+    dados_cidade_es = ceps_es.loc[ceps_es['Cidade']==cidade_es]
+    cep_max_cidade = dados_cidade_es['CEP'].max()
+    cep_min_cidade = dados_cidade_es['CEP'].min()
+    ceps_min_max_es.loc[linha_es] = [cidade_es,cep_min_cidade,cep_max_cidade]
+    linha_es = linha_es + 1
+
+ceps_min_max = pd.concat([ceps_min_max_sp,ceps_min_max_rj, ceps_min_max_mg, ceps_min_max_es])
+qtde_linhas_ceps_min_max = (ceps_min_max['cidade']).count()
+linha_ceps_simul = 0
+
+simulacao_ceps_min_rte = pd.DataFrame(columns = ['cidade','cep','cod','peso','valor','prazo'])
+simulacao_ceps_max_rte = pd.DataFrame(columns = ['cidade','cep','cod','peso','valor','prazo'])
+simulacao_cidades_happening = pd.DataFrame(columns = ['cidade','cod','peso','valor','prazo'])
+simulacao_ceps_min_jamef = pd.DataFrame(columns = ['cidade','cep','cod','peso','valor','prazo'])
+simulacao_ceps_max_jamef = pd.DataFrame(columns = ['cidade','cep','cod','peso','valor','prazo'])
+
+simulacao_ceps_min_braspress= pd.DataFrame(columns = ['cidade','cep','cod','peso','valor','prazo'])
+simulacao_ceps_max_braspress = pd.DataFrame(columns = ['cidade','cep','cod','peso','valor','prazo'])
+
+simulacao_cidade_transexpress= pd.DataFrame(columns = ['cidade','cod','peso','valor','prazo'])
+simulacao_cidade_leofran = pd.DataFrame(columns = ['cidade','cod','peso','valor','prazo'])
+
+
+
+while linha_produto < qtde_linhas_produtos:
+    cod = produtos.iloc[linha_produto,0] 
+    peso = produtos.iloc[linha_produto,3]
+    altura = produtos.iloc[linha_produto,5]
+    largura = produtos.iloc[linha_produto,4]
+    profundidade = produtos.iloc[linha_produto,6]
+    m3 = (altura * largura * profundidade)
+    diametro= math.sqrt((largura*largura)+(profundidade*profundidade))
+    diametro = str(diametro)
+    valor = produtos.iloc[linha_produto,2]
+    valor = round(valor,2)
+    
+    while linha_ceps_simul < qtde_linhas_ceps_min_max:
+        cidade = ceps_min_max.iloc[linha_ceps_simul,0]
+        cep_min = str(ceps_min_max.iloc[linha_ceps_simul,1])
+        cep_max = str(ceps_min_max.iloc[linha_ceps_simul,2])
+        
+        if len(cep_min) == 7:
+            cep_min = '0'+cep_min
+        if len(cep_max) == 7:
+            cep_max = '0'+cep_max
+
+        peso = str(peso)
+        altura=str(altura)
+        largura=str(largura)
+        profundidade = str(profundidade)
+
+        url_cidade_min= "https://01wapi.rte.com.br/api/v1/busca-por-cep?zipCode="+cep_min
+        headers_rte= {"Authorization": "Bearer "+token, "Content-Type":"application/json" }
+        parametros_cidade = {}
+        cidade_consulta_min = requests.request("GET", url_cidade_min, headers=headers_rte, data=parametros_cidade)
+        IdCidade_min = json.loads(cidade_consulta_min.content)
+        message_min = pd.DataFrame(IdCidade_min)
+        message_min = message_min.iloc[0,1]
+
+        if 'RTE' in message_min:                
+            prazo_rte = '-'
+            valor_rte = '-'
+        else:
+            IdCidade_min=str(IdCidade_min['CityId'])
+            url_simulacotacao = "https://01wapi.rte.com.br/api/v1/simula-cotacao"
+            data_cotacao_min = '{"OriginZipCode": "06530075" ,"OriginCityId": 9560, "DestinationZipCode":"'+str(cep_min)+'","DestinationCityId":"'+str(IdCidade_min)+'", "TotalWeight":"'+str(peso)+'", "EletronicInvoiceValue":"'+str(valor)+'", "CustomerTaxIdRegistration": "55963771000176", "Packs": [{"AmountPackages": 1,"Weight":"'+str(peso)+'","Length":"'+str(profundidade)+'","Height":"'+str(altura)+'","Width":"'+str(largura)+'"}]}'
+            response_rte_min = requests.request("POST", url_simulacotacao, headers=headers_rte, data=data_cotacao_min)
+            valor_rte_min = json.loads(response_rte_min.content)
+            prazo_rte_min = str(valor_rte_min['DeliveryTime'])
+            valor_rte_min = "R$ "+str(valor_rte_min['Value']).replace(".",",")
+                    
+        simulacao_ceps_min_rte.loc[linha_ceps_simul] = [cidade,cep_min,cod,peso,valor_rte_min,prazo_rte_min]
+
+        url_cidade_max= "https://01wapi.rte.com.br/api/v1/busca-por-cep?zipCode="+cep_max
+        headers_rte_max= {"Authorization": "Bearer "+token, "Content-Type":"application/json" }
+        parametros_cidade = {}
+        cidade_consulta_max = requests.request("GET", url_cidade_max, headers=headers_rte, data=parametros_cidade)
+        IdCidade_max = json.loads(cidade_consulta_max.content)
+        message_max = pd.DataFrame(IdCidade_max)
+        message_max = message_max.iloc[0,1]
+        if 'RTE' in message_max:                
+            prazo_rte_max = '-'
+            valor_rte_max = '-'
+        else:
+            IdCidade_max = str(IdCidade_max['CityId'])
+            url_simulacotacao = "https://01wapi.rte.com.br/api/v1/simula-cotacao"
+            data_cotacao_max = '{"OriginZipCode": "06530075" ,"OriginCityId": 9560, "DestinationZipCode":"'+str(cep_max)+'","DestinationCityId":"'+str(IdCidade_max)+'", "TotalWeight":"'+str(peso)+'", "EletronicInvoiceValue":"'+str(valor)+'", "CustomerTaxIdRegistration": "55963771000176", "Packs": [{"AmountPackages": 1,"Weight":"'+str(peso)+'","Length":"'+str(profundidade)+'","Height":"'+str(altura)+'","Width":"'+str(largura)+'"}]}'
+            response_rte_max = requests.request("POST", url_simulacotacao, headers=headers_rte, data=data_cotacao_max)
+            valor_rte_max = json.loads(response_rte_max.content)
+            prazo_rte_max = str(valor_rte_max['DeliveryTime'])
+            valor_rte_max = "R$ "+str(valor_rte_max['Value']).replace(".",",")
+            
+        simulacao_ceps_max_rte.loc[linha_ceps_simul] = [cidade,cep_max,cod,peso,valor_rte_max,prazo_rte_max]
+         
+        try:
+            cidade_happening = dados_happening.loc[dados_happening['Cidade'] == (cidade).upper()]
+            prazo_happening = str(cidade_happening.iloc[0,1])
+            cidade_happening = str(cidade_happening.iloc[0,0])
+            happening = 1
+        except IndexError:
+            prazo_happening = '-'
+            valor_happening = '-'
+            happening = 0
+                    
+        if happening == 1:
+            if valor <= 1846.14:
+                valor_happening = 120
+            if 10000 >= valor >= 1846.15:
+                valor_happening = valor * 0.065
+            if 10000.01 <= valor <= 15000:
+                valor_happening = valor *0.055
+            if 15000.01 <= valor <= 25000:
+                valor_happening = valor *0.045
+            if 25000.01 <= valor <= 30000:
+                valor_happening = valor *0.035
+            if 30000.00 < valor:
+                valor_happening = valor *0.03
+            valor_happening = round(valor_happening,2)
+            valor_happening = str(valor_happening).replace(".",",")      
+
+        simulacao_cidades_happening.loc[linha_ceps_simul] = [cidade,cod,peso,valor_happening,prazo_happening]
+
+        url_jamef_min = 'http://www.jamef.com.br/frete/rest/v1/1/55963771000176/ribeiraopreto/SP/000004/'+str(peso)+'/'+str(valor)+'/'+str(m3)+'/'+str(cep_min)+'/18/'+str(data_atual2)+'/T911416'
+        response_jamef_min = requests.get(url_jamef_min)
+        valor_jamef_min = response_jamef_min.text
+        valor_jamef_min = "["+valor_jamef_min+"]"
+        valor_jamef_min = pd.read_json(valor_jamef_min)
+
+        if valor_jamef_min.empty:
+            valor_jamef_min = "-"
+            prazo_jamef_min = "-"
+        else:    
+            valor_jamef_min = float(valor_jamef_min.iloc[0,0])
+            valor_jamef_min = round(valor_jamef_min,2)
+            valor_jamef_min = str(valor_jamef_min).replace(".",",")
+            prazo_jamef_min= '-'
+        
+        simulacao_ceps_min_jamef.loc[linha_ceps_simul] = [cidade,cep_min,cod,peso,valor_jamef_min,prazo_jamef_min]
+
+        url_jamef_max = 'http://www.jamef.com.br/frete/rest/v1/1/55963771000176/ribeiraopreto/SP/000004/'+str(peso)+'/'+str(valor)+'/'+str(m3)+'/'+str(cep_min)+'/18/'+str(data_atual2)+'/T911416'
+        response_jamef_max = requests.get(url_jamef_max)
+        valor_jamef_max = response_jamef_max.text
+        valor_jamef_max = "["+valor_jamef_max+"]"
+        valor_jamef_max = pd.read_json(valor_jamef_max)
+
+        if valor_jamef_max.empty:
+            transportadora_jamef_max = 'Jamef'
+            valor_jamef_max = "-"
+            prazo_jamef_max = "-"
+        else:    
+            valor_jamef_max = float(valor_jamef_max.iloc[0,0])
+            valor_jamef_max = round(valor_jamef_max,2)
+            valor_jamef_max = str(valor_jamef_max).replace(".",",")
+            prazo_jamef_max= '-'
+
+        simulacao_ceps_max_jamef.loc[linha_ceps_simul] = [cidade,cep_max,cod,peso,valor_jamef_max,prazo_jamef_max]
+    
+        url_braspress =  "https://hml-api.braspress.com/v1/cotacao/calcular/json"
+        json_braspress_min= '{"cnpjRemetente":"55963771000176","cnpjDestinatario":"'+cnpjdestinatario+'","modal":"R","tipoFrete":"1","cepOrigem":"06530075","cepDestino":"'+cep_min+'","vlrMercadoria":"'+str(valor)+'","peso":"'+peso+'","volumes":"1","cubagem":[{"comprimento":"'+profundidade+'","largura":"'+largura+'","altura":"'+altura+'","volumes":"1"}]}'
+        headers_braspress = {'Content-Type':'application/json'}
+        response_braspress_min = requests.request("POST", url=url_braspress, auth=HTTPBasicAuth('ZANOTTI_HML', '#3&Jw23rZ7Y%$w&O'),headers=headers_braspress,data=json_braspress_min)
+        valor_braspress_min = response_braspress_min.text
+        valor_braspress_min = "["+valor_braspress_min+"]"
+        valor_braspress_min = pd.read_json(valor_braspress_min)
+        valor_braspress2_min = str(valor_braspress_min.iloc[0,2]).replace(".",",")
+        prazo_braspress_min = (valor_braspress_min.iloc[0,1])
+
+        simulacao_ceps_min_braspress.loc[linha_ceps_simul] = [cidade,cep_min,cod,peso,valor_braspress2_min,prazo_braspress_min]
+    
+        json_braspress_max= '{"cnpjRemetente":"55963771000176","cnpjDestinatario":"'+cnpjdestinatario+'","modal":"R","tipoFrete":"1","cepOrigem":"06530075","cepDestino":"'+cep_max+'","vlrMercadoria":"'+str(valor)+'","peso":"'+peso+'","volumes":"1","cubagem":[{"comprimento":"'+profundidade+'","largura":"'+largura+'","altura":"'+altura+'","volumes":"1"}]}'
+        response_braspress_max = requests.request("POST", url=url_braspress, auth=HTTPBasicAuth('ZANOTTI_HML', '#3&Jw23rZ7Y%$w&O'),headers=headers_braspress,data=json_braspress_max)
+        valor_braspress_max = response_braspress_max.text
+        valor_braspress_max = "["+valor_braspress_max+"]"
+        valor_braspress_max = pd.read_json(valor_braspress_max)
+        valor_braspress2_max = str(valor_braspress_max.iloc[0,2]).replace(".",",")
+        prazo_braspress_max = (valor_braspress_max.iloc[0,1])
+
+        simulacao_ceps_max_braspress.loc[linha_ceps_simul] = [cidade,cep_max,cod,peso,valor_braspress2_max,prazo_braspress_max]
+        
+        try:
+            cidade_transexpress = cidades_transexpress.loc[cidades_transexpress['cidade'] == str(cidade).upper()]
+            praca_transexpress =  str(cidade_transexpress.iloc[0,1])
+            prazo_transexpress = '-'                
+            valor_transexpress = float(valor)*0.0185
+            if praca_transexpress == 'RP':
+                if valor_transexpress < 35:
+                    valor_transexpress = 35
+            if praca_transexpress == 'SJRP':
+                if valor_transexpress < 38:
+                    valor_transexpress = 38
+                        
+            valor_transexpress = round(valor_transexpress,2)
+            valor_transexpress = str(valor_transexpress).replace('.',',')
+        
+        except IndexError:
+            prazo_transexpress = '-'
+            valor_transexpress = '-'           
+
+        simulacao_cidade_transexpress.loc[linha_ceps_simul] = [cidade,cod,peso,valor_transexpress,prazo_transexpress]
+
+        ###Leofran###
+        peso_cubado = round((m3*300),2)
+                    
+        if float(peso) < peso_cubado:
+            peso_leofran = peso_cubado
+        else:
+            peso_leofran = peso
+        try:
+            cidade_leofran = cpp_leofran.loc[cpp_leofran['cidade'] == str(cidade).upper()]
+            prazo_leofran = cidade_leofran.iloc[0,1]
+            praca_leofran = str(cidade_leofran.iloc[0,2])
+            fracao_pedagio_valor = 3
+            seguro_porc = 0.2
+            gris_porc = 0.2
+            excedente_valor = 0
+
+            if (praca_leofran == 'RAO') or (praca_leofran == 'FRA'):
+                excedente_valor_por_kg = 0.25
+                if peso_leofran <= 20:
+                    fixo_valor =  20
+                if peso_leofran > 20 and peso_leofran <= 50:
+                    fixo_valor =  23
+                if peso_leofran > 50 and peso_leofran <= 70:
+                    fixo_valor =  28
+                if peso_leofran > 70 and peso_leofran <= 100:
+                    fixo_valor =  32
+                if peso_leofran > 100:
+                    fixo_valor = 32
+            if (praca_leofran == 'CAM') or (praca_leofran == 'SAO'):
+                excedente_valor_por_kg = 0.30
+                if peso_leofran <= 20:
+                    fixo_valor =  23
+                if peso_leofran > 20 and peso_leofran <= 50:
+                    fixo_valor =  32
+                if peso_leofran > 50 and peso_leofran <= 70:
+                    fixo_valor =  38
+                if peso_leofran > 70 and peso_leofran <= 100:
+                    fixo_valor =  43
+                if peso_leofran > 100:
+                    fixo_valor = 32
+                
+            if praca_leofran == 'SJC':
+                excedente_valor_por_kg = 0.40
+                if peso_leofran <= 20:
+                    fixo_valor =  32
+                if peso_leofran > 20 and peso_leofran <= 50:
+                    fixo_valor =  40
+                if peso_leofran > 50 and peso_leofran <= 70:
+                    fixo_valor =  48
+                if peso_leofran > 70 and peso_leofran <= 100:
+                    fixo_valor =  55
+                if peso_leofran > 100:
+                    fixo_valor = 32
+            pedagio = (peso_leofran//100)*fracao_pedagio_valor
+
+            if peso_leofran > 100:
+                excedente_valor = (peso_leofran-100)*excedente_valor_por_kg
+                
+                if peso_leofran % 100 != 0:
+                    pedagio = pedagio + fracao_pedagio_valor                     
+                else:
+                    pedagio = fracao_pedagio_valor           
+            valor_leofran = fixo_valor + excedente_valor + pedagio 
+            valor_leofran = float((valor_leofran + (valor_leofran*seguro_porc)+(valor_leofran*gris_porc))*1.12)
+            valor_leofran = round(valor_leofran,2)
+            valor_leofran = str(valor_leofran)
+            valor_leofran = "R$ " + str(valor_leofran).replace(".",",")
+        
+        except:
+            prazo_leofran = '-'
+            valor_leofran = '-'
+
+        simulacao_cidade_leofran.loc[linha_ceps_simul] = [cidade,cod,peso,valor_leofran,prazo_leofran]
+
+        print('Linha Produto: ',linha_produto,'Produto: ',cod,'Linha CEP: ',linha_ceps_simul,'CEP min: ',cep_min, 'CEP max: ', cep_max)
+        
+        linha_ceps_simul = linha_ceps_simul + 1
+
+    print('rte max',simulacao_ceps_max_rte)
+    print('rte min',simulacao_ceps_min_rte)
+    print('happening',simulacao_cidades_happening)
+    print('max braspress',simulacao_ceps_max_braspress)
+    print('min braspress',simulacao_ceps_min_braspress)
+    print('max jamef',simulacao_ceps_max_jamef)
+    print('min jamef',simulacao_ceps_min_jamef)
+    print('leofran',simulacao_cidade_leofran)
+    print('transexpress',simulacao_cidade_transexpress)
+
+    linha_produto = linha_produto + 1
+'''
+    simulacao_ceps_max_rte.to_excel('')
+    simulacao_ceps_min_rte.to_excel('')
+
+    simulacao_cidades_happening
+
+    simulacao_ceps_max_braspress
+    simulacao_ceps_min_braspress
+
+    simulacao_ceps_max_jamef
+    simulacao_ceps_min_jamef
+
+    simulacao_cidade_leofran
+    simulacao_cidade_transexpress
+'''
+  
