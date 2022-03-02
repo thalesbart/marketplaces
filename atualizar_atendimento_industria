@@ -1,0 +1,102 @@
+from tkinter import messagebox
+from pandas import DataFrame
+import pyodbc 
+import sys
+import pandas as pd
+import numpy as np
+import os
+
+server = '192.168.1.15' 
+database = 'PROTHEUS_ZANOTTI_PRODUCAO' 
+username = 'totvs' 
+password = 'totvsip' 
+conn = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER='+server+';DATABASE='+database+';UID='+username+';PWD='+ password)
+cursor = conn.cursor()
+recno="SELECT MAX (R_E_C_N_O_) +1 FROM SUB010"
+path=("//192.168.1.16/02 - Público/15 - Vendas Industria/Calculo Dimensional Camara/atendimento_produtos/")
+path2=("//192.168.1.16/02 - Público/15 - Vendas Industria/Calculo Dimensional Camara/atendimento_produtos")
+
+listadearquivos= os.listdir(path2)
+verificacao = 0
+linha=0
+linha2=0
+
+for file in listadearquivos:
+
+    file2 = file.rsplit("-")
+    vendedor = file2[0]
+    atendimento = str(file2[1])
+    atendimento = "0" + atendimento.rsplit(".")[0]
+    dados_atendimento = pd.read_sql('SELECT UA_NUM, UA_OPER,UA_VEND FROM SUA010 WITH (NOLOCK) WHERE UA_NUM ='+atendimento,conn)
+    vendedor_atd = str(dados_atendimento.iloc[0,2])
+    operacao_atd = str(dados_atendimento.iloc[0,1])
+    
+    if vendedor == vendedor_atd and operacao_atd != 4:
+        verificacao = 1
+    if operacao_atd == 4:
+        messagebox.showinfo("Atenção!","O Atendimento está Liberado para Faturamento, não é possível adicionar produtos a ele. Procure o departamento de Faturamento para Libera-lo.")
+    if vendedor != vendedor_atd:
+        messagebox.showinfo("Atenção!","O Atendimento não é do mesmo vendedor contido na Planilha. Verifique e tente novamente.")
+    
+    if verificacao == 1:
+        delete_itens = "DELETE FROM SUB010 WHERE UB_NUM ='"+atendimento+"'AND UB_ITEM <>'01'"
+        cursor.execute(delete_itens)
+        conn.commit()
+
+        df_conteudo = pd.read_excel(path + file, names=['item','prod','calc','esp','m2','qtde','cod'], header=0)
+        numero_linhas = (df_conteudo['item'].count()-1)
+
+        while (linha <= numero_linhas):
+            UltItem2 = "SELECT MAX(UB_ITEM) +1 FROM SUB010 WHERE D_E_L_E_T_ = '' AND UB_FILIAL = '0101' AND UB_NUM = '"+atendimento+"'"
+            UltItem2 = pd.read_sql(UltItem2, conn)
+            UltimoItem = UltItem2.iloc[0,0]
+            UltimoItem = str(UltimoItem)
+            
+            if linha == 0:
+                UltimoItem = 0
+                
+            else:
+                UltimoItem = UltimoItem
+                UltimoItem = int(UltimoItem)
+                
+            if (UltimoItem <= 9):
+                UltimoItem = str(UltimoItem)
+                UltimoItem = '0'+ UltimoItem
+
+            UltimoItem = str(UltimoItem)
+            recno2 = pd.read_sql(recno,conn)
+            recno2 = recno2.loc[[0],'']
+            recno2 = recno2.to_string(index = False)
+            recno2 = recno2.lstrip() 
+            
+            cod1 = str(df_conteudo.iloc[linha,6]).replace(" ","")
+            itens_qtde = df_conteudo['item'].count()
+
+            if cod1 != '0':
+                cod = df_conteudo.iloc[linha,6]
+                cod2 = str(df_conteudo.iloc[linha,4]).replace(" ","")
+                
+                if cod2 != '0.0' and cod2 != '0':
+                    qtde = round(df_conteudo.iloc[linha,4],4)
+                else:
+                    qtde = df_conteudo.iloc[linha,5]
+                    qtde = round(qtde,4)             
+                qtde = str(qtde)
+                cod = str(cod)
+                
+                if linha2 == 0:
+                    update = "UPDATE SUB010 SET UB_PRODUTO = '"+cod+"', UB_QUANT = '"+qtde+"' WHERE D_E_L_E_T_ = '' AND UB_FILIAL = '0101' AND UB_NUM ='"+atendimento+"'" 
+                    cursor.execute(update)
+                    conn.commit()
+                    linha2 = linha2 + 1
+                else:
+                    insert2 = "INSERT INTO SUB010 (UB_FILIAL, UB_NUM, UB_ITEM, UB_PRODUTO, UB_QUANT,UB_OPER, UB_ZZOPER, R_E_C_N_O_) VALUES ('0101','"+atendimento+"','"+UltimoItem+"','"+cod+"','"+qtde+"','01','01','"+recno2+"')"
+                   
+                    cursor.execute(insert2)
+                    conn.commit()
+                  
+            linha = linha + 1
+        messagebox.showinfo("Concluído!","Todos os produtos foram enviados para o Atendimento")        
+        os.remove( path + file)
+        
+  
