@@ -1,3 +1,4 @@
+from calendar import calendar
 from datetime import datetime
 import tkinter
 from numpy import append
@@ -33,6 +34,7 @@ from datetime import datetime, timedelta
 import threading
 import time
 from tkinter import Text, filedialog
+from tkcalendar import Calendar
 
 server = '192.168.1.15' 
 database = 'PROTHEUS_ZANOTTI_PRODUCAO' 
@@ -100,7 +102,9 @@ def sol_cotacao():
             cnpjdestinatario = str(cnpjdestinatario).replace("-","")
             cnpjdestinatario = (cnpjdestinatario).replace(".","")
             cnpjdestinatario = (cnpjdestinatario).replace("/","")
-            valor= var_valor_nf_cf.get()
+            valor = var_valor_nf_cf.get()
+            if valor == '':
+                valor = valor_bd
             valor = str(valor).replace(",",".")
             valor = (valor).replace("R$","")
             valor = round(float(valor),2)
@@ -120,25 +124,27 @@ def sol_cotacao():
             ano = data[4:8]
             print(dia+"/"+mes+"/"+ano)
             cepdestino = var_cep_cf.get()
+            cepdestino = str(cepdestino).replace("-","")
             cep = str(cepdestino).replace("-","")
             servico = "04510" #pac--sedex "04014"
             peso = float(peso)
             altura=float(altura)
             largura=float(largura)
-            profundidade=float(profundidade)
-
-            if valor == '':
-                valor = valor_bd
+            profundidade=float(profundidade)           
 
             url_cep = "https://viacep.com.br/ws/"+cepdestino+"/json/"
             request_endereco_cep = requests.request("GET",url_cep)
             request_endereco_cep = json.loads(request_endereco_cep.content)
-            rua = request_endereco_cep['logradouro'] 
-            bairro = request_endereco_cep['bairro'] 
-            cidade = request_endereco_cep['localidade'] 
-            estado = request_endereco_cep['uf'] 
-            var_label_consulta_frete.set(rua+', '+bairro+' - '+cidade+", "+estado)
-
+            teste_cep = pd.DataFrame.from_dict(json_normalize(request_endereco_cep),orient = 'columns')
+            try:
+                rua = request_endereco_cep['logradouro'] 
+                bairro = request_endereco_cep['bairro'] 
+                cidade = request_endereco_cep['localidade'] 
+                estado = request_endereco_cep['uf']
+                var_label_consulta_frete.set(rua+', '+bairro+' - '+cidade+", "+estado)
+            except:
+                messagebox.askretrycancel('Atenção','CEP não encontrado.')
+                #limpar()
             if (peso <= 30) and (altura <=  1.05) and (largura <= 1.05) and (profundidade <= 1.05):
                 peso = str(peso)
                 altura=str(altura)
@@ -189,13 +195,15 @@ def sol_cotacao():
             parametros_cidade = {}
             cidade_consulta = requests.request("GET", url_cidade, headers=headers_rte, data=parametros_cidade)
             IdCidade = json.loads(cidade_consulta.content)
+            print(IdCidade)
+            message = pd.DataFrame(IdCidade)
+            message = message.iloc[0,1]
 
-            try:
-                IdCidade['PropertyName'] == ''
+            if 'RTE' in message:                
                 transportadora_rte = 'Rodonaves'
                 prazo_rte = '-'
                 valor_rte = '-'
-            except:
+            else:
                 IdCidade=str(IdCidade['CityId'])
                 url_simulacotacao = "https://01wapi.rte.com.br/api/v1/simula-cotacao"
                 data_cotacao = '{"OriginZipCode": "06530075" ,"OriginCityId": 9560, "DestinationZipCode":"'+str(cepdestino)+'","DestinationCityId":"'+str(IdCidade)+'", "TotalWeight":"'+str(peso)+'", "EletronicInvoiceValue":"'+str(valor)+'", "CustomerTaxIdRegistration": "55963771000176", "Packs": [{"AmountPackages": 1,"Weight":"'+str(peso)+'","Length":"'+str(profundidade)+'","Height":"'+str(altura)+'","Width":"'+str(largura)+'"}]}'
@@ -283,7 +291,7 @@ def sol_cotacao():
                 distancia = (distancia).replace(".","")
                 distancia = (distancia).replace(",",".")
                 distancia = float(distancia)
-                valor_zanotti = round(((distancia*2)*1.7)+(pedagio*2),2)
+                valor_zanotti = round(((distancia*2)*2)+(pedagio*2),2)
                 valor_zanotti = "R$ "+ str(valor_zanotti).replace(".",",")
             
                 cotacao_zanotti = [transportadora_zanotti,valor_zanotti,prazo_zanotti]
@@ -313,11 +321,17 @@ def sol_cotacao():
             valor_jamef = response_jamef.text
             valor_jamef = "["+valor_jamef+"]"
             valor_jamef = pd.read_json(valor_jamef)
-            valor_jamef = float(valor_jamef.iloc[0,0])
-            valor_jamef = round(valor_jamef,2)
-            valor_jamef = "R$ "+str(valor_jamef).replace(".",",")
-            transportadora_jamef = 'Jamef'
-            prazo_jamef= '-'
+
+            if valor_jamef.empty:
+                transportadora_jamef = 'Jamef'
+                valor_jamef = "-"
+                prazo_jamef = "-"
+            else:    
+                valor_jamef = float(valor_jamef.iloc[0,0])
+                valor_jamef = round(valor_jamef,2)
+                valor_jamef = "R$ "+str(valor_jamef).replace(".",",")
+                transportadora_jamef = 'Jamef'
+                prazo_jamef= '-'
 
             cotacao_jamef= [transportadora_jamef,valor_jamef,prazo_jamef]
             acompanhamento_cf.insert('','end',values = cotacao_jamef)
@@ -327,7 +341,7 @@ def sol_cotacao():
             largura=float(largura)
             profundidade=float(profundidade)
 
-            if (peso <= 70) and (altura <= 1) and (largura<=1) and (profundidade<=1):
+            if (peso <= 70) and (altura <= 1.2) and (largura<=1.2) and (profundidade<=1.2):
                 peso = str(peso)
                 altura = str(altura)
                 largura = str(largura)
@@ -357,10 +371,10 @@ def sol_cotacao():
             profundidade=float(profundidade)
             
             cidades_transexpress = pd.read_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Tabelas Frete/transexpress.xlsx')
-       
+            
             try:
-                cidade_transexpress = cidades_transexpress.loc[cidades_transexpress['Cidade'] == cidade]
-                praca_transexpress =  str(cidades_transexpress.iloc[0,1])
+                cidade_transexpress = cidades_transexpress.loc[cidades_transexpress['cidade'] == str(cidade).upper()]
+                praca_transexpress =  str(cidade_transexpress.iloc[0,1])
                 prazo_transexpress = '-'                
                 valor_transexpress = float(valor)*0.0185
                 if praca_transexpress == 'RP':
@@ -369,6 +383,7 @@ def sol_cotacao():
                 if praca_transexpress == 'SJRP':
                     if valor_transexpress < 38:
                         valor_transexpress = 38
+                
                 valor_transexpress = round(valor_transexpress,2)
                 valor_transexpress = "R$ "+str(valor_transexpress).replace('.',',')
                 transportadora_transexpress = 'Trans Express'
@@ -380,65 +395,109 @@ def sol_cotacao():
                 valor_transexpress = '-'           
                 cotacao_transexpress= [transportadora_transexpress,valor_transexpress,prazo_transexpress]
                 acompanhamento_cf.insert('','end',values = cotacao_transexpress)
-            '''
+           
             ###Leofran###
             m3 = largura*altura*profundidade
+            peso_cubado = round(m3*300,2)
+            
+            if peso < peso_cubado:
+                peso_leofran = peso_cubado
+            else:
+                peso_leofran = peso
             cpp_leofran = pd.read_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Tabelas Frete/leofran.xlsx')
-            prazo_leofran = cpp_leofran.loc[cpp_leofran['prazo'] == cidade]
-            praca_leofran = cpp_leofran.loc[cpp_leofran['praça'] == cidade]
-            fracao_pedagio_valor = 3
-            seguro_porc = 0.2
-            gris_porc = 0.2
-            if praca_leofran == 'RAO' or 'FRA':
-                excedente_valor_por_kg: 0.25
-                if peso <= 20:
-                    fixo_valor =  20
+            
+            try:
+                cidade_leofran = cpp_leofran.loc[cpp_leofran['cidade'] == str(cidade).upper()]
+                
+                prazo_leofran = cidade_leofran.iloc[0,1]
+                praca_leofran = str(cidade_leofran.iloc[0,2])
+                
+                fracao_pedagio_valor = 3
+                seguro_porc = 0.2
+                gris_porc = 0.2
+                excedente_valor = 0
 
-                if peso > 20 and peso <= 50:
-                    fixo_valor =  23
+                if (praca_leofran == 'RAO') or (praca_leofran == 'FRA'):
+                    excedente_valor_por_kg= 0.25 
+                    
+                    if peso_leofran <= 20:
+                        fixo_valor =  20
 
-                if peso > 50 and peso <= 70:
-                    fixo_valor =  28
+                    if peso_leofran > 20 and peso_leofran <= 50:
+                        fixo_valor =  23
 
-                if peso > 70 and peso <= 100:
-                    fixo_valor =  32
+                    if peso_leofran > 50 and peso_leofran <= 70:
+                        fixo_valor =  28
 
-            if praca_leofran == 'CAM' or 'SAO':
-                excedente_valor_por_kg: 0.30
-                if peso <= 20:
-                    fixo_valor =  23
+                    if peso_leofran > 70 and peso_leofran <= 100:
+                        fixo_valor =  32
+                    if peso_leofran > 100:
+                        fixo_valor = 32
 
-                if peso > 20 and peso <= 50:
-                    fixo_valor =  32
+                if (praca_leofran == 'CAM') or (praca_leofran == 'SAO'):
+                    
+                    excedente_valor_por_kg= 0.30
+                    
+                    if peso_leofran <= 20:
+                        fixo_valor =  23
 
-                if peso > 50 and peso <= 70:
-                    fixo_valor =  38
+                    if peso_leofran > 20 and peso_leofran <= 50:
+                        fixo_valor =  32
 
-                if peso > 70 and peso <= 100:
-                    fixo_valor =  43
+                    if peso_leofran > 50 and peso_leofran <= 70:
+                        fixo_valor =  38
 
-            if praca_leofran == 'SJC':
-                excedente_valor_por_kg: 0.40
-                if peso <= 20:
-                   fixo_valor =  32
+                    if peso_leofran > 70 and peso_leofran <= 100:
+                        fixo_valor =  43
 
-                if peso > 20 and peso <= 50:
-                    fixo_valor =  40
+                    if peso_leofran > 100:
+                        fixo_valor = 32
+                    
+                if praca_leofran == 'SJC':
+                    excedente_valor_por_kg = 0.40
+                    if peso_leofran <= 20:
+                        fixo_valor =  32
 
-                if peso > 50 and peso <= 70:
-                    fixo_valor =  48
+                    if peso_leofran > 20 and peso_leofran <= 50:
+                        fixo_valor =  40
 
-                if peso > 70 and peso <= 100:
-                    fixo_valor =  55
+                    if peso_leofran > 50 and peso_leofran <= 70:
+                        fixo_valor =  48
 
-            cidades_leofran = []
-            transportadora_leofran = 'Leofran'
-            valor_leofran = '-'
-            prazo_leofran = '-'
-            cotacao_leofran= [transportadora_leofran,valor_leofran,prazo_leofran]
-            acompanhamento_cf.insert('','end',values = cotacao_leofran)
+                    if peso_leofran > 70 and peso_leofran <= 100:
+                        fixo_valor =  55
+
+                    if peso_leofran > 100:
+                        fixo_valor = 32
+                
+                if peso_leofran > 100:
+                    
+                    excedente_valor = (peso_leofran-100)*excedente_valor_por_kg
+                    pedagio = (peso_leofran//100)*fracao_pedagio_valor
+                        
+                    if peso_leofran % 100 != 0:
+                        pedagio = pedagio + fracao_pedagio_valor
+                        
+                else:
+                    pedagio = fracao_pedagio_valor  
+                
+                valor_leofran = fixo_valor + excedente_valor + pedagio 
+                valor_leofran = float((valor_leofran + (valor_leofran*seguro_porc)+(valor_leofran*gris_porc))*1.12)
+                valor_leofran = round(valor_leofran,2)
+                valor_leofran = str(valor_leofran)
+                valor_leofran = "R$ " + str(valor_leofran).replace(".",",")
+                transportadora_leofran = 'Leofran'
+                cotacao_leofran= [transportadora_leofran,valor_leofran,prazo_leofran]
+                acompanhamento_cf.insert('','end',values = cotacao_leofran)
+            except:
+                transportadora_leofran = 'Leofran'
+                prazo_leofran = '-'
+                valor_leofran = '-'
+                cotacao_leofran= [transportadora_leofran,valor_leofran,prazo_leofran]
+                acompanhamento_cf.insert('','end',values = cotacao_leofran)
+
             var_mensagem_cf.set('Consulta de frete realizada com sucesso!')
-        '''
+       
 def limpar():
     var_cod_prod_cf.set('')
     var_cpf_cnpj_cf.set('')
@@ -486,6 +545,8 @@ label_dt_exped_nf_cf = tk.Label(janela, text="Data Expedição", fg="black").pla
 var_dt_exped_nf_cf = tk.StringVar()
 ent_dt_exped_nf_cf = tk.Entry(janela,fg="black", width = 12, textvariable = var_dt_exped_nf_cf).place(x=190,y=70)
 
+#cal = Calendar(janela, selectmode='day').place(x=190,y=70)
+
 var_cot_zan = tk.IntVar()
 cb_cot_zan = tk.Radiobutton(janela,text="Cotar pela Zanotti", variable=var_cot_zan, value=1).place(x=280,y=40)
 cb_nao_cot_zan = tk.Radiobutton(janela,text="Não cotar pela Zanotti", variable=var_cot_zan, value=0).place(x=280,y=60)
@@ -523,11 +584,11 @@ txt_stk_prod_cf = tk.Entry(janela, bg= "#eff0f1", textvariable = var_stk_prod_cf
 
 acompanhamento_cf = ttk.Treeview(janela, selectmode="browse", column=('Transportadora','Preço','Prazo'),show ='headings')
 acompanhamento_cf.column('Transportadora',width=180, minwidth=50, stretch=NO)
-acompanhamento_cf.heading('#1', text='Transportadora')
-acompanhamento_cf.column('Preço',width=110, minwidth=50, stretch=NO)
-acompanhamento_cf.heading('#2', text='Preço')
-acompanhamento_cf.column('Prazo',width=108, minwidth=50, stretch=NO)
-acompanhamento_cf.heading('#3', text='Prazo')
+acompanhamento_cf.heading('#1', text='Transportadora',anchor=CENTER)
+acompanhamento_cf.column('Preço',width=110, minwidth=50, stretch=NO,anchor=CENTER)
+acompanhamento_cf.heading('#2', text='Preço',anchor=CENTER)
+acompanhamento_cf.column('Prazo',width=108, minwidth=50, stretch=NO,anchor=CENTER)
+acompanhamento_cf.heading('#3', text='Prazo',anchor=CENTER)
 acompanhamento_cf.place(height=200, width=400,x=18, y=290)
 
 var_mensagem_cf = StringVar()
