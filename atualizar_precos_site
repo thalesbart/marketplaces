@@ -1,0 +1,123 @@
+from glob import escape
+from operator import index
+from pickle import FALSE
+import pandas as pd
+import pyodbc
+import numpy as np
+import csv, json
+from datetime import date
+from datetime import datetime
+from selenium import webdriver
+import selenium
+from selenium.webdriver.chrome import options
+from selenium.webdriver.chrome.options import Options
+from time import sleep
+
+from sqlalchemy import false
+
+server = '192.168.1.15' 
+database = 'PROTHEUS_ZANOTTI_PRODUCAO' 
+username = 'totvs' 
+password = 'totvsip' 
+conn = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER='+server+';DATABASE='+database+';UID='+username+';PWD='+ password)
+cursor = conn.cursor()
+
+data_atual = datetime.today()
+data_atual = data_atual.strftime("%y%m%d_%H%M")
+
+plan2 = open ('//192.168.1.16/02 - Público/09 - Marketing/Thales/atualização site/'+data_atual+'.csv','w')
+plan2.write('codigo,"preco_antigo","preco","preco_prazo","desconto","habilitado","destaque"')
+plan2.write("\n")
+
+produtos = "SELECT \
+            TRIM(SB1.B1_COD) AS COD ,\
+            SB1.B1_ZIDWEB,\
+            SB1.B1_ZPROMOC,\
+            SB1.B1_MSBLQL,\
+            SB1.B1_CUSTD * (SB1.B1_ZPERCAT / 100 + 1) * 1.12 AS PRECOORIGINAL,\
+            ISNULL((SELECT MAX(DA1.DA1_PRCVEN) FROM DA1010 DA1 WHERE DA1.DA1_CODPRO = SB1.B1_COD AND DA1_CODTAB = 'LJA' GROUP BY DA1.DA1_CODPRO),0) AS TabLJA \
+            FROM SB1010 SB1 \
+            LEFT JOIN DA1010 DA1 ON DA1.D_E_L_E_T_ = '' AND SB1.B1_COD = DA1.DA1_CODPRO \
+            WHERE B1_ZIDWEB<>'' AND  B1_ZIDWEB<>0 \
+            GROUP BY SB1.B1_COD, SB1.B1_ZIDWEB, SB1.B1_ZPROMOC, SB1.B1_CUSTD, SB1.B1_ZPERCAT,SB1.B1_MSBLQL"
+
+produtos = pd.read_sql(produtos,conn)
+qtde_produtos = produtos['COD'].count()
+linha = 0
+planilha_produtos = pd.DataFrame(columns=['codigo,"preco_antigo","preco","preco_prazo","desconto","habilitado","destaque"'])
+
+while linha < qtde_produtos :
+    cod = produtos.iloc[linha,0]
+    preco_antigo = produtos.iloc[linha,4]
+    preco = produtos.iloc[linha,5]
+    preco_vista = preco * 0.93
+    if preco_antigo == preco:
+        preco_antigo = 0.00
+    preco_prazo = produtos.iloc[linha,5]
+    parcela = preco_prazo/10
+    habilitado = produtos.iloc[linha,3]
+    destaque = str(produtos.iloc[linha,2])
+    if habilitado == '"':
+        habilitado = '1'
+    if destaque == 'S':
+        destaque = '2'
+        if preco_antigo != 0.00:
+            desconto = round((1-(preco_vista / preco_antigo))*100)
+            desconto = str(desconto)+'%'
+            preco_antigo = round(preco_antigo,2)
+        else:
+            desconto = '7%'
+    else:
+        destaque = '1'
+        preco_antigo = '0,00'
+        desconto = '7%'
+    
+    preco_prazo = round(preco_prazo,2)
+    preco_vista = round(preco_vista,2)
+    parcela = round(parcela,2)
+
+    plan3 = str(cod)+',"'+str(preco_antigo).replace('.',',')+'","'+str(preco_vista).replace('.',',')+'","ou R$ '+str(preco_prazo).replace('.',',')+' em 10x de R$ '+str(parcela).replace('.',',')+'","'+str(desconto)+'","'+str(habilitado)+'","'+str(destaque)+'"'
+    
+    linha = linha + 1
+    plan2.write(plan3)
+    plan2.write("\n")
+
+plan2.close()
+
+sleep(1)
+
+options = webdriver.ChromeOptions()
+#options.add_argument("--headless")
+navegador = webdriver.Chrome('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Ferramentas/chromedriver.exe', chrome_options=options)
+navegador.get('https://www.zanottirefrigeracao.com.br/area_restrita')
+
+input_user = navegador.find_element_by_name('data[User][username]')
+input_user.send_keys('admin')
+
+input_password = navegador.find_element_by_name('data[User][password]')
+input_password.send_keys('a1s2d3f4')
+navegador.find_element_by_xpath('//*[@id="UserAdminLoginForm"]/button').click()
+navegador.find_element_by_xpath('/html/body/div[2]/a[7]').click()
+navegador.find_element_by_xpath('/html/body/div[3]/div[1]/div/a[1]').click()
+arquivo = navegador.find_element_by_xpath('//*[@id="ProdutoCsv"]')
+arquivo.send_keys('//192.168.1.16/02 - Público/09 - Marketing/Thales/atualização site/'+data_atual+'.csv')
+sleep(3)
+navegador.find_element_by_xpath('//*[@id="ProdutoAdminImportForm"]/div[2]/div/button').click()
+retorno = navegador.find_element_by_xpath('/html/body/div[3]/div[1]').text
+log1 = str(data_atual+' - ' + retorno)
+sleep(3)
+log = open ('//192.168.1.16/02 - Público/09 - Marketing/Thales/atualização site/log.txt','r')
+
+conteudo = log.readlines()
+
+# insira seu conteúdo
+# obs: o método append() é proveniente de uma lista
+conteudo.append("\n"+log1)
+
+# Abre novamente o arquivo (escrita)
+# e escreva o conteúdo criado anteriormente nele.
+log = open('//192.168.1.16/02 - Público/09 - Marketing/Thales/atualização site/log.txt', 'w')
+log.writelines(conteudo)
+log.close()
+
+navegador.close()
