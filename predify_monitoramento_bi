@@ -1,0 +1,343 @@
+import pandas as pd
+import numpy as np
+import pyodbc
+import csv, json
+import requests
+
+server = '192.168.1.15' 
+database = 'PROTHEUS_ZANOTTI_PRODUCAO' 
+username = 'totvs' 
+password = 'totvsip' 
+conn = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER='+server+';DATABASE='+database+';UID='+username+';PWD='+ password)
+cursor = conn.cursor()
+'''
+headers= {'Content-Type':'x-www-form-urlencoded'}
+url_autenticacao= "https://web-service.predify.me/token"
+parametros= {'grant_type': 'password','username':'zanotti@predify.integracao.me', 'password':'wdKrW0Rsx1oCMKz6SW3X','client_id': 'zanotti-app'}
+autenticacao = requests.request("POST", url_autenticacao, headers=headers, data=parametros)
+autenticacao=(autenticacao.text)
+'''
+
+resultado_monitoramento = pd.read_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Monitoramento/relatorio_monitoramento_predify.xlsx',engine='openpyxl')
+skus = resultado_monitoramento['PN'].unique()
+
+qtde_skus = len(resultado_monitoramento['PN'].unique())
+
+dados_skus = "DECLARE @vardataini VARCHAR(30),@vardatafim VARCHAR(30);\
+                SET @vardataini = CONCAT(SUBSTRING((CONVERT(VARCHAR,(DATEADD(month,-3,GETDATE())),112)),0,7),'01')\
+                SET @vardatafim = CONCAT(SUBSTRING((CONVERT(VARCHAR,(DATEADD(month,-1,GETDATE())),112)),0,7),'31')\
+                SELECT TRIM(SB1.B1_COD) AS SKU,\
+                ISNULL((SELECT SUM(B2_QATU - B2_RESERVA)\
+                FROM SB2010 WHERE D_E_L_E_T_ = '' AND B2_LOCAL = '01' AND B2_COD = SB1.B1_COD),0) AS SALDO,\
+                ISNULL(( SELECT TOP 1 D1_VUNIT FROM SD1010 WHERE 1=1 AND D_E_L_E_T_ = '' AND D1_COD = SB1.B1_COD AND D1_TIPO = 'N' \
+                ORDER BY D1_DTDIGIT DESC ), 0) AS ULT_PREÇO,\
+                SB1.B1_UCOM AS ULT_COMP,\
+                SB1.B1_CUSTD AS CUSTO,\
+                TRIM(SA2.A2_NREDUZ) AS MARCA, \
+                ISNULL((SELECT (SUM(SL2.L2_QUANT)) FROM SL2010 SL2 WHERE SL2.D_E_L_E_T_ = '' AND SL2.L2_DOC <>'' AND SL2.L2_PRODUTO = SB1.B1_COD AND SL2.L2_VEND = '000099' AND SL2.L2_EMISSAO BETWEEN CONCAT(SUBSTRING((CONVERT(VARCHAR,GETDATE(),112)),0,7), '01') AND CONCAT(SUBSTRING((CONVERT(VARCHAR,GETDATE(),112)),0,7), '31')),0) AS DEMANDA_MKTPLACE,\
+                ISNULL((SELECT (SUM(SL2.L2_QUANT)) FROM SL2010 SL2 WHERE SL2.D_E_L_E_T_ = '' AND SL2.L2_DOC <>'' AND SL2.L2_PRODUTO = SB1.B1_COD AND SL2.L2_VEND = '000099' AND SL2.L2_EMISSAO BETWEEN @vardataini AND @vardatafim),0) AS DEMANDA_MKTPLACE_ANTERIOR,\
+                SB1.B1_ZDESRDZ AS TITULO,\
+                SB1.B1_ZCATEG AS CATEGORIA,\
+                SB1.B1_ZAPRES1 AS APRESENTACAO,\
+                SB1.B1_CODBAR AS EAN\
+                FROM SB1010 SB1 \
+          		LEFT JOIN SA2010 SA2 ON SA2.D_E_L_E_T_ = '' AND SA2.A2_COD = SB1.B1_PROC AND SA2.A2_LOJA = SB1.B1_LOJPROC \
+                WHERE 1=1 AND SB1.D_E_L_E_T_ = '' AND SUBSTRING(SB1.B1_GRUPO,1,2) = 'MR' AND SB1.B1_COD IN ("+str(skus).replace("[","").replace("]","").replace(" ",",")+")"
+
+dados_skus = pd.read_sql(dados_skus,conn)
+qtde_monitoramento = resultado_monitoramento['Grupo'].count()
+linha = 0
+
+produtos_resultado = pd.DataFrame(columns = (['Código','Título','Marca','EAN','Nosso Stk','Custo','Preço Unit. Entrada','Última Entrada','Demanda atual','Demanda 3 meses','Menor preço','Markup menor preço','Categoria','Cod_Apresentacao','Loja Americanas','Seller Ame','Tipo Ame','Parcelas Ame','Valor Parcelas Ame','Americanas PB','Estoque Ame','Preço Médio Ame','Markup Ame','Seller Magalu','Tipo Magalu','Parcelas Magalu','Valor Parcelas Magalu','Magalu PB','Estoque Magalu','Preço Médio Magalu','Markup Magalu','Seller Meli','Tipo Meli','Parcelas Meli','Valor Parcelas Meli','Meli PB','Estoque Meli','Preço Médio Meli','Markup Meli','Seller Amazon','Tipo Amazon','Parcelas Amazon','Valor Parcelas Amazon','Amazon PB','Estoque Amazon','Preço Médio Amazon','Markup Amazon','Loja Via','Seller Via','Tipo Via','Parcelas Via','Valor Parcelas Via','Via PB','Estoque Via','Preço Médio Via','Markup Via','Seller MM','Tipo MM','Parcelas MM','Valor Parcelas MM','MM PB','Estoque MM','Preço Médio MM','Markup MM']))
+produtos_monitoramento_geral = pd.DataFrame(columns = (['Código','Título','Marketplace','Seller','Stk','Preço','Markup','Parcela']))
+
+skus_geral = resultado_monitoramento['PN']
+linha_geral = 0
+for sku_geral in skus_geral:
+    #sku_geral = resultado_monitoramento.iloc[0,6]
+    marketplace_geral = resultado_monitoramento.iloc[linha_geral,8]
+    seller_geral = resultado_monitoramento.iloc[linha_geral,9].capitalize()
+    titulo_seller_geral = resultado_monitoramento.iloc[linha_geral,4].capitalize()
+    stk_geral =resultado_monitoramento.iloc[linha_geral,13]
+    if stk_geral == 'Estoque Não Encontrado':
+        stk_geral = 0
+    parcela_geral = resultado_monitoramento.iloc[linha_geral,12]
+    preco_geral = int(resultado_monitoramento.iloc[linha_geral,12]) * float(resultado_monitoramento.iloc[linha_geral,10])
+    preco_geral = round(preco_geral,1)
+    comissao = 0.815
+    custo = (dados_skus.loc[dados_skus['SKU']==sku_geral]).iloc[0,4]
+
+    if marketplace_geral == 'Americanas' or marketplace_geral == 'Shoptime' or marketplace_geral == 'Submarino':
+        comissao = 0.84
+    if marketplace_geral == 'Extra' or marketplace_geral == 'CasasBahia' or marketplace_geral == 'PontoFrio':
+        comissao = 0.84
+    if marketplace_geral == 'MagazineLuiza':
+        comissao = 0.87
+    if marketplace_geral == 'Mercado Livre':
+        comissao = 0.82
+    if marketplace_geral == 'Amazon':
+        comissao = 0.87
+    if marketplace_geral == 'Madeira Madeira':
+        comissao = 0.815
+    markup1 = float(preco_geral)*comissao
+    if seller_geral == 'Zanotti Refrigeração':
+        markup1 = preco_geral
+    markup = round(markup1/float(custo),2)
+
+    produtos_monitoramento_geral.loc[linha_geral] = [sku_geral,titulo_seller_geral,marketplace_geral,seller_geral,stk_geral,preco_geral,markup,parcela_geral]
+    linha_geral = linha_geral + 1
+print(produtos_monitoramento_geral)
+
+for sku in skus:
+    por_sku = resultado_monitoramento.loc[resultado_monitoramento['PN'] == sku]
+    por_sku = por_sku.assign(Valor_Final = (por_sku['Parcelas']) * (por_sku['Valor']))
+    titulo = str(dados_skus.loc[dados_skus['SKU']==sku].iloc[0,8]).capitalize()
+    marca = str(por_sku.iloc[0,7]).capitalize()
+    ean = str(dados_skus.loc[dados_skus['SKU']==sku_geral].iloc[0,11])
+    if len(ean) == 13:
+        ean = 'S'
+    else:
+        ean = 'N'
+    stk = (dados_skus.loc[dados_skus['SKU']==sku]).iloc[0,1]
+   
+    custo = (dados_skus.loc[dados_skus['SKU']==sku]).iloc[0,4]
+    custo = round(custo,2)
+    preco_entrada = (dados_skus.loc[dados_skus['SKU']==sku]).iloc[0,2]
+    preco_entrada = round(preco_entrada,2)
+    dt_ult_entrada = (dados_skus.loc[dados_skus['SKU']==sku]).iloc[0,3]
+    demanda_atual_mktplace = (dados_skus.loc[dados_skus['SKU']==sku]).iloc[0,6]
+    demanda_anterior_mktplace = (dados_skus.loc[dados_skus['SKU']==sku]).iloc[0,7]
+    menor_preco1 = por_sku.query("Estoque != 'Estoque Não Encontrado'")
+    if menor_preco1.empty:
+        x=0
+    else:
+        menor_preco = menor_preco1['Valor_Final'].min()
+        seller_menor_preco1 = menor_preco1.loc[menor_preco1['Valor_Final'] == menor_preco]
+        seller_menor_preco = seller_menor_preco1.iloc[0,9].capitalize()
+        marketplace_menor_preco = seller_menor_preco1.iloc[0,8]
+
+        if marketplace_menor_preco == 'Americanas' or marketplace_menor_preco == 'Shoptime' or marketplace_menor_preco == 'Submarino':
+            comissao_menor_preco = 0.84
+        if marketplace_menor_preco == 'Extra' or marketplace_menor_preco == 'CasasBahia' or marketplace_menor_preco == 'PontoFrio':
+            comissao_menor_preco = 0.84
+        if marketplace_menor_preco == 'MagazineLuiza':
+            comissao_menor_preco = 0.87
+        if marketplace_menor_preco == 'Mercado Livre':
+            comissao_menor_preco = 0.82
+        if marketplace_menor_preco == 'Amazon':
+            comissao_menor_preco = 0.87
+        if marketplace_menor_preco == 'Madeira Madeira':
+            comissao_menor_preco = 0.815
+
+        markup1_menor_preco = float(preco_geral)*comissao_menor_preco
+        if seller_menor_preco == 'Zanotti refrigeração':
+            markup1_menor_preco = menor_preco
+        markup_menor_preco = round(float(markup1_menor_preco)/custo,2)
+
+    categoria = str(dados_skus.loc[dados_skus['SKU']==sku].iloc[0,9]).capitalize()
+    cod_apresentacao = str(dados_skus.loc[dados_skus['SKU']==sku].iloc[0,10])
+   
+    americanas = por_sku.query("(Company == 'Americanas' or Company == 'Shoptime' or Company =='Submarino') and Estoque != 'Estoque Não Encontrado' ")
+    if americanas.empty:
+        ame_pb = '-'
+        ame_dados_pb = '-'
+        ame_loja_pb = '-'
+        ame_seller_pb = '-'
+        ame_valor_parc_pb = '-'
+        ame_mkup = '-'
+        ame_tipo_pb = '-'
+        ame_parcelas_pb = '-'
+        ame_estoque_pb = '-'
+        ame_pm = '-'
+        
+    else:
+        ame_pb = americanas['Valor_Final'].min()
+        ame_dados_pb = americanas.loc[americanas['Valor_Final'] == ame_pb]
+        ame_pb = round(ame_pb,2)
+        ame_loja_pb = ame_dados_pb.iloc[0,8]
+        ame_seller_pb = str(ame_dados_pb.iloc[0,9]).capitalize()
+        ame_valor_parc_pb = ame_dados_pb.iloc[0,10]
+        ame_valor_parc_pb = round(ame_valor_parc_pb,2)
+        ame_comissao = 0.84
+        ame_mkup1 = float(ame_pb)*ame_comissao
+        if ame_seller_pb == 'Zanotti Refrigeração':
+            ame_mkup1 = ame_pb
+        ame_mkup = round(ame_mkup1/float(custo),2)
+        ame_mkup = str(ame_mkup)
+        ame_tipo_pb = ame_dados_pb.iloc[0,11]
+        ame_parcelas_pb = ame_dados_pb.iloc[0,12]
+        ame_estoque_pb = ame_dados_pb.iloc[0,13]
+        if ame_estoque_pb == 'Estoque Não Encontrado':
+            ame_estoque_pb = 0
+        ame_pm = americanas['Valor_Final'].mean()
+        ame_pm = round(ame_pm,2)
+        ame_link_pb = ame_dados_pb.iloc[0,5]
+        print(ame_link_pb)
+
+    magalu = por_sku.query("Company == 'MagazineLuiza' and Estoque != 'Estoque Não Encontrado'")
+    if magalu.empty:
+        magalu_pb = '-'
+        magalu_dados_pb = '-'
+        magalu_seller_pb = '-'
+        magalu_valor_parc_pb = '-'
+        magalu_mkup = '-'
+        magalu_tipo_pb = '-'
+        magalu_parcelas_pb = '-'
+        magalu_estoque_pb = '-'
+        magalu_pm = '-'
+    else:
+        magalu_pb = magalu['Valor_Final'].min()
+        magalu_dados_pb = magalu.loc[magalu['Valor_Final'] == magalu_pb]
+        magalu_pb = round(magalu_pb,2)
+        magalu_seller_pb = magalu_dados_pb.iloc[0,9].capitalize()
+        magalu_valor_parc_pb = magalu_dados_pb.iloc[0,10]
+        magalu_valor_parc_pb = round(magalu_valor_parc_pb,2)
+        magalu_tipo_pb = magalu_dados_pb.iloc[0,11]
+        magalu_parcelas_pb = magalu_dados_pb.iloc[0,12]
+        magalu_comissao = 0.87
+        magalu_mkup1 = float(magalu_pb)*magalu_comissao
+        if magalu_seller_pb == 'Zanotti Refrigeração':
+            magalu_mkup1 = magalu_pb
+        magalu_mkup = round(magalu_mkup1/float(custo),2)
+        magalu_mkup = str(magalu_mkup)
+        magalu_estoque_pb = magalu_dados_pb.iloc[0,13]
+        if magalu_estoque_pb == 'Estoque Não Encontrado':
+            magalu_estoque_pb = 0
+        magalu_pm = magalu['Valor_Final'].mean()
+        magalu_pm = round(magalu_pm,2)
+
+    meli = por_sku.query("Company == 'Mercado Livre'and Estoque != 'Estoque Não Encontrado'")
+    if meli.empty:
+        meli_pb = '-'
+        meli_dados_pb = '-'
+        meli_seller_pb = '-'
+        meli_mkup = '-'
+        meli_valor_parc_pb = '-'
+        meli_tipo_pb = '-'
+        meli_parcelas_pb = '-'
+        meli_estoque_pb = '-'
+        meli_pm = '-'
+    else:
+        meli_pb = meli['Valor_Final'].min()
+        meli_dados_pb = meli.loc[meli['Valor_Final'] == meli_pb]
+        meli_pb = round(meli_pb,2)
+        meli_seller_pb = meli_dados_pb.iloc[0,9].capitalize()
+        meli_valor_parc_pb = meli_dados_pb.iloc[0,10]
+        meli_valor_parc_pb = round(meli_valor_parc_pb,2)
+        meli_tipo_pb = meli_dados_pb.iloc[0,11]
+        meli_parcelas_pb = meli_dados_pb.iloc[0,12]
+        meli_comissao = 0.82
+        meli_mkup1 = float(meli_pb)*meli_comissao
+        if meli_seller_pb == 'Zanotti Refrigeração':
+            meli_mkup1 = meli_pb
+        meli_mkup = round(meli_mkup1/float(custo),2)
+        meli_mkup = str(meli_mkup)
+        meli_estoque_pb = meli_dados_pb.iloc[0,13]
+        if meli_estoque_pb == 'Estoque Não Encontrado':
+            meli_estoque_pb = 0
+        meli_pm = meli['Valor_Final'].mean()
+        meli_pm = round(meli_pm,2)
+
+    amazon = por_sku.query("Company == 'Amazon'and Estoque != 'Estoque Não Encontrado'")
+    if amazon.empty:
+        amazon_pb = '-'
+        amazon_dados_pb = '-'
+        amazon_seller_pb = '-'
+        amazon_valor_parc_pb = '-'
+        amazon_tipo_pb = '-'
+        amazon_mkup = '-'
+        amazon_parcelas_pb = '-'
+        amazon_estoque_pb = '-'
+        amazon_pm = '-'
+    else:
+        amazon_pb = amazon['Valor_Final'].min()
+        amazon_dados_pb = amazon.loc[amazon['Valor_Final'] == amazon_pb]
+        amazon_pb = round(amazon_pb,2)
+        amazon_seller_pb = amazon_dados_pb.iloc[0,9].capitalize()
+        amazon_valor_parc_pb = amazon_dados_pb.iloc[0,10]
+        amazon_valor_parc_pb = round(amazon_valor_parc_pb,2)
+        amazon_tipo_pb = amazon_dados_pb.iloc[0,11]
+        amazon_parcelas_pb = amazon_dados_pb.iloc[0,12]
+        amazon_comissao = 0.87
+        amazon_mkup1 = float(amazon_pb)*amazon_comissao
+        if amazon_seller_pb == 'Zanotti Refrigeração':
+            amazon_mkup1 = amazon_pb
+        amazon_mkup = round(amazon_mkup1/float(custo),2)
+        amazon_mkup = str(amazon_mkup)
+        amazon_estoque_pb = amazon_dados_pb.iloc[0,13]
+        if amazon_estoque_pb == 'Estoque Não Encontrado':
+            amazon_estoque_pb = 0
+        amazon_pm = amazon['Valor_Final'].mean()
+        amazon_pm = round(amazon_pm,2)
+
+    via = por_sku.query("(Company == 'Pontofrio' or Company == 'CasasBahia' or Company == 'Extra') and Estoque != 'Estoque Não Encontrado'")
+    if via.empty:
+        via_pb = '-'
+        via_dados_pb = '-'
+        via_loja_pb = '-'
+        via_seller_pb = '-'
+        via_mkup = '-'
+        via_valor_parc_pb = '-'
+        via_tipo_pb = '-'
+        via_parcelas_pb = '-'
+        via_estoque_pb = '-'
+        via_pm = '-'
+    else:
+        via_pb = via['Valor_Final'].min()
+        via_dados_pb = via.loc[via['Valor_Final'] == via_pb]
+        via_pb = round(via_pb,2)
+        via_loja_pb = via_dados_pb.iloc[0,8]
+        via_seller_pb = via_dados_pb.iloc[0,9].capitalize()
+        via_valor_parc_pb = via_dados_pb.iloc[0,10]
+        via_valor_parc_pb = round(via_valor_parc_pb,2)
+        via_tipo_pb = via_dados_pb.iloc[0,11]
+        via_parcelas_pb = via_dados_pb.iloc[0,12]
+        via_comissao = 0.84
+        via_mkup1 = float(via_pb)*via_comissao
+        if via_seller_pb == 'Zanotti Refrigeração':
+            via_mkup1 = via_pb
+        via_mkup = round(via_mkup1/float(custo),2)
+        via_mkup = str(via_mkup)
+        via_estoque_pb = via_dados_pb.iloc[0,13]
+        if via_estoque_pb == 'Estoque Não Encontrado':
+            via_estoque_pb = 0
+        via_pm = via['Valor_Final'].mean()
+        via_pm = round(via_pm,2)
+
+    mm = por_sku.query("Company == 'MadeiraMadeira' and Estoque != 'Estoque Não Encontrado'")
+    if mm.empty:
+        mm_pb = '-'
+        mm_dados_pb = '-'
+        mm_seller_pb = '-'
+        mm_valor_parc_pb = '-'
+        mm_tipo_pb = '-'
+        mm_mkup = '-'
+        mm_parcelas_pb = '-'
+        mm_estoque_pb = '-'
+        mm_pm = '-'
+    else:
+        mm_pb = mm['Valor_Final'].min()
+        mm_dados_pb = mm.loc[mm['Valor_Final'] == mm_pb]
+        mm_pb = round(mm_pb,2)
+        mm_seller_pb = mm_dados_pb.iloc[0,9].capitalize()
+        mm_valor_parc_pb = mm_dados_pb.iloc[0,10]
+        mm_valor_parc_pb = round(mm_valor_parc_pb,2)
+        mm_tipo_pb = mm_dados_pb.iloc[0,11]
+        mm_parcelas_pb = mm_dados_pb.iloc[0,12]
+        mm_comissao = 0.815
+        mm_mkup1= float(mm_pb)*mm_comissao
+        if mm_seller_pb == 'Zanotti Refrigeração':
+            mm_mkup1 = mm_pb
+        mm_mkup = round(mm_mkup1/float(custo),2)
+        mm_mkup = str(mm_mkup)
+        mm_estoque_pb = mm_dados_pb.iloc[0,13]
+        if mm_estoque_pb == 'Estoque Não Encontrado':
+            mm_estoque_pb = 0
+        mm_pm = mm['Valor_Final'].mean()
+        mm_pm = round(mm_pm,2)
+    
+    produtos_resultado.loc[linha]=[sku,titulo,marca,ean,stk,custo,preco_entrada,dt_ult_entrada,demanda_atual_mktplace,demanda_anterior_mktplace,menor_preco,markup_menor_preco,categoria,cod_apresentacao,ame_loja_pb,ame_seller_pb,ame_tipo_pb,ame_parcelas_pb,ame_valor_parc_pb,ame_pb,ame_estoque_pb,ame_pm,ame_mkup,magalu_seller_pb,magalu_tipo_pb,magalu_parcelas_pb,magalu_valor_parc_pb,magalu_pb,magalu_estoque_pb,magalu_pm,magalu_mkup,meli_seller_pb,meli_tipo_pb,meli_parcelas_pb,meli_valor_parc_pb,meli_pb,meli_estoque_pb,meli_pm,meli_mkup,amazon_seller_pb,amazon_tipo_pb,amazon_parcelas_pb,amazon_valor_parc_pb,amazon_pb,amazon_estoque_pb,amazon_pm,amazon_mkup,via_loja_pb,via_seller_pb,via_tipo_pb,via_parcelas_pb,via_valor_parc_pb,via_pb,via_estoque_pb,via_pm,via_mkup,mm_seller_pb,mm_tipo_pb,mm_parcelas_pb,mm_valor_parc_pb,mm_pb,mm_estoque_pb,mm_pm,mm_mkup]
+    linha = linha + 1
+
+tabela_monitoramento = pd.DataFrame(produtos_resultado)
+#print(tabela_monitoramento)
