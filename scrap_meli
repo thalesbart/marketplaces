@@ -1,0 +1,76 @@
+from attr import attrs
+from bs4 import BeautifulSoup
+import requests
+from bs4 import BeautifulSoup
+import numpy as np
+import pandas as pd
+
+lista_produtos = pd.read_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Scrap_MeLi/Itens_pesquisar/itens_pesquisar.xlsx')
+print(lista_produtos)
+qtde_produtos = lista_produtos['Produtos'].count()
+linha_produtos = 0
+produtos_resultado = pd.DataFrame(columns = (['Título','Valor à Vista','link']))
+
+qtde_categorias = lista_produtos['Categorias'].count()
+linha_categorias = 0
+categorias_resultado = pd.DataFrame(columns = (['Título','Valor à Vista','link']))
+
+qtde_fornecedores = lista_produtos['Fornecedores'].count()
+linha_fornecedores = 0
+fornecedores_resultado = pd.DataFrame(columns=(['Título','Valor à Vista','link']))
+linha = 0
+while linha_produtos < qtde_produtos:
+    produto = lista_produtos.iloc[linha_produtos,0]
+    pagina_response = requests.get('https://lista.mercadolivre.com.br/'+produto)
+    pagina = BeautifulSoup(pagina_response.text,'html.parser')
+    produtos = pagina.findAll('li',attrs={'class':'ui-search-layout__item'})
+    linha_produtos = linha_produtos + 1
+    
+    for produto in produtos:
+        titulo = produto.find('h2',attrs={'class':'ui-search-item__title'})
+        link = produto.find('a',attrs={'class':'ui-search-link'})
+        valor_vista = produto.find('span',attrs={'class':'price-tag-fraction'})
+        #print('Título:', titulo.text)
+        #print('link: ', link['href'])
+        #print('Valor à vista: ', valor_vista.text)
+        produtos_resultado.loc[linha] = ([titulo.text,valor_vista.text,link['href']])
+        linha = linha + 1
+
+print('produtos',produtos_resultado)
+linha = 0
+while linha_categorias < qtde_categorias:
+    categoria = lista_produtos.iloc[linha_categorias,1]
+    pagina_response = requests.get('https://lista.mercadolivre.com.br/'+categoria)
+    pagina = BeautifulSoup(pagina_response.text,'html.parser')
+    categorias = pagina.findAll('li',attrs={'class':'ui-search-layout__item'})
+    linha_categorias = linha_categorias + 1
+    
+    for categoria in categorias:
+        titulo = categoria.find('h2',attrs={'class':'ui-search-item__title'})
+        link = categoria.find('a',attrs={'class':'ui-search-link'})
+        valor_vista = categoria.find('span',attrs={'class':'price-tag-fraction'})
+        #print('Título:', titulo.text)
+        #print('link: ', link['href'])
+        #print('Valor à vista: ', valor_vista.text)
+        categorias_resultado.loc[linha] = ([titulo.text,valor_vista.text,link['href']])
+        linha = linha + 1
+print('categorias',categorias_resultado)
+linha = 0
+while linha_fornecedores < qtde_fornecedores:
+    fornecedor = lista_produtos.iloc[linha_fornecedores,2]
+    pagina_response = requests.get('https://lista.mercadolivre.com.br/'+fornecedor)
+    pagina = BeautifulSoup(pagina_response.text,'html.parser')
+    fornecedores = pagina.findAll('li',attrs={'class':'ui-search-layout__item'})
+    linha_fornecedores = linha_fornecedores + 1
+    
+    for fornecedor in fornecedores:
+        titulo = fornecedor.find('h2',attrs={'class':'ui-search-item__title'})
+        link = fornecedor.find('a',attrs={'class':'ui-search-link'})
+        valor_vista = fornecedor.find('span',attrs={'class':'price-tag-fraction'})
+        #print('Título:', titulo.text)
+        #print('link: ', link['href'])
+        #print('Valor à vista: ', valor_vista.text)
+        fornecedores_resultado.loc[linha] = ([titulo.text,valor_vista.text,link['href']])
+        linha = linha + 1
+print('fornecedores',fornecedores_resultado)
+#planilha_produtos.to_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Scrap_MeLi/'+produto_pesquisa+'.xlsx')
