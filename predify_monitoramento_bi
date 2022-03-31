@@ -3,6 +3,9 @@ import numpy as np
 import pyodbc
 import csv, json
 import requests
+import wget
+from datetime import datetime, date, timedelta
+import sys,os
 
 server = '192.168.1.15' 
 database = 'PROTHEUS_ZANOTTI_PRODUCAO' 
@@ -10,17 +13,43 @@ username = 'totvs'
 password = 'totvsip' 
 conn = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER='+server+';DATABASE='+database+';UID='+username+';PWD='+ password)
 cursor = conn.cursor()
-'''
+
 headers= {'Content-Type':'x-www-form-urlencoded'}
 url_autenticacao= "https://web-service.predify.me/token"
 parametros= {'grant_type': 'password','username':'zanotti@predify.integracao.me', 'password':'wdKrW0Rsx1oCMKz6SW3X','client_id': 'zanotti-app'}
 autenticacao = requests.request("POST", url_autenticacao, headers=headers, data=parametros)
 autenticacao=(autenticacao.text)
-'''
+autenticacao = json.loads(autenticacao)
+token = str(autenticacao['access_token'])
 
-resultado_monitoramento = pd.read_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Monitoramento/relatorio_monitoramento_predify.xlsx',engine='openpyxl')
+data_atual = date.today()
+data_inicial = data_atual + timedelta(days=-30)
+data_inicial = data_inicial.strftime("%Y-%m-%d")
+data_final = data_atual.strftime("%Y-%m-%d")
+
+company = '2343'
+url2 = 'https://web-service.predify.me/api/precificacao/Search_V2?idCompany='+company+'&start_date='+data_inicial+'&end_date='+data_final+'&searchType=2&exportToExcel=true&exportAsDataList=true'
+headers2= {"Authorization": "Bearer "+token, "Content-Type":"application/json"}
+#parametros2 = {'idCompany':'2343','start_date':'2022-02-11','end_date':'2022-03-31','searchType':'2','exportToExcel':'True','exportAsDataList':'True'}
+consulta = requests.request("GET", url2, headers=headers2)
+consulta = json.loads(consulta.content)
+consulta = pd.json_normalize(consulta)
+link = consulta.iloc[0,2]
+link = str('https://app.predify.me/download/Planilha/'+link)
+destino_monitoramento = '//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Monitoramento/relatorio_monitoramento_predify-'+data_final+'.xlsx'
+
+dir = os.listdir('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Monitoramento/')
+for file in dir:
+    os.remove('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Monitoramento/' + str(file))
+
+wget.download(link,destino_monitoramento)
+relatorio_monitoramento = pd.read_excel(destino_monitoramento)
+relatorio_monitoramento['Parcelas'] = relatorio_monitoramento['Parcelas'].str.replace('x','')
+resultado_monitoramento = relatorio_monitoramento
+#resultado_monitoramento['Parcelas'] = float(resultado_monitoramento['Parcelas'])
+#resultado_monitoramento.to_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Monitoramento/teste3.xlsx')
+#resultado_monitoramento = pd.read_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Monitoramento/relatorio_monitoramento_predify.xlsx',engine='openpyxl')
 skus = resultado_monitoramento['PN'].unique()
-
 qtde_skus = len(resultado_monitoramento['PN'].unique())
 
 dados_skus = "DECLARE @vardataini VARCHAR(30),@vardatafim VARCHAR(30);\
@@ -48,19 +77,21 @@ dados_skus = pd.read_sql(dados_skus,conn)
 qtde_monitoramento = resultado_monitoramento['Grupo'].count()
 linha = 0
 
-produtos_resultado = pd.DataFrame(columns = (['Código','Título','Marca','EAN','Nosso Stk','Custo','Preço Unit. Entrada','Última Entrada','Demanda atual','Demanda 3 meses','Menor preço','Markup menor preço','Categoria','Cod_Apresentacao','Loja Americanas','Seller Ame','Tipo Ame','Parcelas Ame','Valor Parcelas Ame','Americanas PB','Estoque Ame','Preço Médio Ame','Markup Ame','Seller Magalu','Tipo Magalu','Parcelas Magalu','Valor Parcelas Magalu','Magalu PB','Estoque Magalu','Preço Médio Magalu','Markup Magalu','Seller Meli','Tipo Meli','Parcelas Meli','Valor Parcelas Meli','Meli PB','Estoque Meli','Preço Médio Meli','Markup Meli','Seller Amazon','Tipo Amazon','Parcelas Amazon','Valor Parcelas Amazon','Amazon PB','Estoque Amazon','Preço Médio Amazon','Markup Amazon','Loja Via','Seller Via','Tipo Via','Parcelas Via','Valor Parcelas Via','Via PB','Estoque Via','Preço Médio Via','Markup Via','Seller MM','Tipo MM','Parcelas MM','Valor Parcelas MM','MM PB','Estoque MM','Preço Médio MM','Markup MM']))
+produtos_resultado = pd.DataFrame(columns = (['Código','Título','Marca','EAN','Nosso Stk','Custo','Preço Unit. Entrada','Última Entrada','Demanda atual','Demanda 3 meses','Menor preço','Markup menor preço','Categoria','Cod_Apresentacao','Loja Americanas','Seller Ame','Tipo Ame','Parcelas Ame','Valor Parcelas Ame','Americanas PB','Estoque Ame','Preço Médio Ame','Markup Ame','Seller Magalu','Tipo Magalu','Parcelas Magalu','Valor Parcelas Magalu','Magalu PB','Estoque Magalu','Preço Médio Magalu','Markup Magalu','Seller Meli','Tipo Meli','Parcelas Meli','Valor Parcelas Meli','Meli PB','Estoque Meli','Preço Médio Meli','Markup Meli','Seller Amazon','Tipo Amazon','Parcelas Amazon','Valor Parcelas Amazon','Amazon PB','Estoque Amazon','Preço Médio Amazon','Markup Amazon','Loja Via','Seller Via','Tipo Via','Parcelas Via','Valor Parcelas Via','Via PB','Estoque Via','Preço Médio Via','Markup Via','Seller MM','Tipo MM','Parcelas MM','Valor Parcelas MM','MM PB','Estoque MM','Preço Médio MM','Markup MM','Seller Shopee','Tipo Shopee','Parcelas Shopee','Valor Parcelas Shopee','Shopee PB','Estoque Shopee','Preço Médio Shopee','Markup Shopee']))
 produtos_monitoramento_geral = pd.DataFrame(columns = (['Código','Título','Marketplace','Seller','Stk','Preço','Markup','Parcela']))
 
 skus_geral = resultado_monitoramento['PN']
 linha_geral = 0
+
 for sku_geral in skus_geral:
-    #sku_geral = resultado_monitoramento.iloc[0,6]
     marketplace_geral = resultado_monitoramento.iloc[linha_geral,8]
     seller_geral = resultado_monitoramento.iloc[linha_geral,9].capitalize()
     titulo_seller_geral = resultado_monitoramento.iloc[linha_geral,4].capitalize()
     stk_geral =resultado_monitoramento.iloc[linha_geral,13]
+
     if stk_geral == 'Estoque Não Encontrado':
         stk_geral = 0
+
     parcela_geral = resultado_monitoramento.iloc[linha_geral,12]
     preco_geral = int(resultado_monitoramento.iloc[linha_geral,12]) * float(resultado_monitoramento.iloc[linha_geral,10])
     preco_geral = round(preco_geral,1)
@@ -77,23 +108,26 @@ for sku_geral in skus_geral:
         comissao = 0.82
     if marketplace_geral == 'Amazon':
         comissao = 0.87
-    if marketplace_geral == 'Madeira Madeira':
+    if marketplace_geral == 'MadeiraMadeira Comércio Eletrônico S/A.':
         comissao = 0.815
+    if marketplace_geral == 'Shopee':
+        comissao = 0.84
     markup1 = float(preco_geral)*comissao
     if seller_geral == 'Zanotti Refrigeração':
         markup1 = preco_geral
+
     markup = round(markup1/float(custo),2)
 
     produtos_monitoramento_geral.loc[linha_geral] = [sku_geral,titulo_seller_geral,marketplace_geral,seller_geral,stk_geral,preco_geral,markup,parcela_geral]
     linha_geral = linha_geral + 1
-print(produtos_monitoramento_geral)
 
 for sku in skus:
     por_sku = resultado_monitoramento.loc[resultado_monitoramento['PN'] == sku]
-    por_sku = por_sku.assign(Valor_Final = (por_sku['Parcelas']) * (por_sku['Valor']))
+    por_sku = por_sku.assign(Valor_Final = (por_sku['Parcelas']).astype(int) * (por_sku['Valor']).astype(float))
     titulo = str(dados_skus.loc[dados_skus['SKU']==sku].iloc[0,8]).capitalize()
     marca = str(por_sku.iloc[0,7]).capitalize()
-    ean = str(dados_skus.loc[dados_skus['SKU']==sku_geral].iloc[0,11])
+    ean = str(dados_skus.loc[dados_skus['SKU'] == sku_geral].iloc[0,11])
+
     if len(ean) == 13:
         ean = 'S'
     else:
@@ -108,6 +142,7 @@ for sku in skus:
     demanda_atual_mktplace = (dados_skus.loc[dados_skus['SKU']==sku]).iloc[0,6]
     demanda_anterior_mktplace = (dados_skus.loc[dados_skus['SKU']==sku]).iloc[0,7]
     menor_preco1 = por_sku.query("Estoque != 'Estoque Não Encontrado'")
+
     if menor_preco1.empty:
         x=0
     else:
@@ -128,8 +163,13 @@ for sku in skus:
             comissao_menor_preco = 0.87
         if marketplace_menor_preco == 'Madeira Madeira':
             comissao_menor_preco = 0.815
+        if marketplace_menor_preco == 'MadeiraMadeira Comércio Eletrônico S/A.':
+            comissao_menor_preco = 0.815
+        if marketplace_menor_preco == 'Shopee':
+            comissao_menor_preco = 0.84
 
-        markup1_menor_preco = float(preco_geral)*comissao_menor_preco
+        markup1_menor_preco = float(menor_preco)*comissao_menor_preco
+
         if seller_menor_preco == 'Zanotti refrigeração':
             markup1_menor_preco = menor_preco
         markup_menor_preco = round(float(markup1_menor_preco)/custo,2)
@@ -304,7 +344,7 @@ for sku in skus:
         via_pm = via['Valor_Final'].mean()
         via_pm = round(via_pm,2)
 
-    mm = por_sku.query("Company == 'MadeiraMadeira' and Estoque != 'Estoque Não Encontrado'")
+    mm = por_sku.query("Company == 'MadeiraMadeira Comércio Eletrônico S/A.' and Estoque != 'Estoque Não Encontrado'")
     if mm.empty:
         mm_pb = '-'
         mm_dados_pb = '-'
@@ -335,9 +375,42 @@ for sku in skus:
             mm_estoque_pb = 0
         mm_pm = mm['Valor_Final'].mean()
         mm_pm = round(mm_pm,2)
+
+    shopee = por_sku.query("Company == 'Shopee' and Estoque != 'Estoque Não Encontrado'")
+    if shopee.empty:
+        shopee_pb = '-'
+        shopee_dados_pb = '-'
+        shopee_seller_pb = '-'
+        shopee_valor_parc_pb = '-'
+        shopee_tipo_pb = '-'
+        shopee_mkup = '-'
+        shopee_parcelas_pb = '-'
+        shopee_estoque_pb = '-'
+        shopee_pm = '-'
+    else:
+        shopee_pb = shopee['Valor_Final'].min()
+        shopee_dados_pb = shopee.loc[shopee['Valor_Final'] == shopee_pb]
+        shopee_pb = round(shopee_pb,2)
+        shopee_seller_pb = shopee_dados_pb.iloc[0,9].capitalize()
+        shopee_valor_parc_pb = shopee_dados_pb.iloc[0,10]
+        shopee_valor_parc_pb = round(shopee_valor_parc_pb,2)
+        shopee_tipo_pb = shopee_dados_pb.iloc[0,11]
+        shopee_parcelas_pb = shopee_dados_pb.iloc[0,12]
+        shopee_comissao = 0.815
+        shopee_mkup1= float(shopee_pb)*shopee_comissao
+        if shopee_seller_pb == 'Zanotti Refrigeração':
+            shopee_mkup1 = shopee_pb
+        shopee_mkup = round(shopee_mkup1/float(custo),2)
+        shopee_mkup = str(mm_mkup)
+        shopee_estoque_pb = shopee_dados_pb.iloc[0,13]
+        if shopee_estoque_pb == 'Estoque Não Encontrado':
+            shopee_estoque_pb = 0
+        shopee_pm = shopee['Valor_Final'].mean()
+        shopee_pm = round(shopee_pm,2)
     
-    produtos_resultado.loc[linha]=[sku,titulo,marca,ean,stk,custo,preco_entrada,dt_ult_entrada,demanda_atual_mktplace,demanda_anterior_mktplace,menor_preco,markup_menor_preco,categoria,cod_apresentacao,ame_loja_pb,ame_seller_pb,ame_tipo_pb,ame_parcelas_pb,ame_valor_parc_pb,ame_pb,ame_estoque_pb,ame_pm,ame_mkup,magalu_seller_pb,magalu_tipo_pb,magalu_parcelas_pb,magalu_valor_parc_pb,magalu_pb,magalu_estoque_pb,magalu_pm,magalu_mkup,meli_seller_pb,meli_tipo_pb,meli_parcelas_pb,meli_valor_parc_pb,meli_pb,meli_estoque_pb,meli_pm,meli_mkup,amazon_seller_pb,amazon_tipo_pb,amazon_parcelas_pb,amazon_valor_parc_pb,amazon_pb,amazon_estoque_pb,amazon_pm,amazon_mkup,via_loja_pb,via_seller_pb,via_tipo_pb,via_parcelas_pb,via_valor_parc_pb,via_pb,via_estoque_pb,via_pm,via_mkup,mm_seller_pb,mm_tipo_pb,mm_parcelas_pb,mm_valor_parc_pb,mm_pb,mm_estoque_pb,mm_pm,mm_mkup]
+    produtos_resultado.loc[linha]=[sku,titulo,marca,ean,stk,custo,preco_entrada,dt_ult_entrada,demanda_atual_mktplace,demanda_anterior_mktplace,menor_preco,markup_menor_preco,categoria,cod_apresentacao,ame_loja_pb,ame_seller_pb,ame_tipo_pb,ame_parcelas_pb,ame_valor_parc_pb,ame_pb,ame_estoque_pb,ame_pm,ame_mkup,magalu_seller_pb,magalu_tipo_pb,magalu_parcelas_pb,magalu_valor_parc_pb,magalu_pb,magalu_estoque_pb,magalu_pm,magalu_mkup,meli_seller_pb,meli_tipo_pb,meli_parcelas_pb,meli_valor_parc_pb,meli_pb,meli_estoque_pb,meli_pm,meli_mkup,amazon_seller_pb,amazon_tipo_pb,amazon_parcelas_pb,amazon_valor_parc_pb,amazon_pb,amazon_estoque_pb,amazon_pm,amazon_mkup,via_loja_pb,via_seller_pb,via_tipo_pb,via_parcelas_pb,via_valor_parc_pb,via_pb,via_estoque_pb,via_pm,via_mkup,mm_seller_pb,mm_tipo_pb,mm_parcelas_pb,mm_valor_parc_pb,mm_pb,mm_estoque_pb,mm_pm,mm_mkup,shopee_seller_pb,shopee_tipo_pb,shopee_parcelas_pb,shopee_valor_parc_pb,shopee_pb,shopee_estoque_pb,shopee_pm,shopee_mkup]
     linha = linha + 1
 
 tabela_monitoramento = pd.DataFrame(produtos_resultado)
+#tabela_monitoramento.to_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Monitoramento/teste3.xlsx')
 #print(tabela_monitoramento)
