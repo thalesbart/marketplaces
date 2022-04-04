@@ -5,11 +5,42 @@ from bs4 import BeautifulSoup
 import numpy as np
 import pandas as pd
 
+from selenium import webdriver
+import selenium
+from selenium.webdriver.chrome import options
+from selenium.webdriver.chrome.options import Options
+from time import sleep
+from pytrends.request import TrendReq
+
+'''
+options = webdriver.ChromeOptions()
+#options.add_argument("--headless")
+#options.binary_location = 'C:/Program Files/Google/Chrome/Application'
+options.add_argument('user-data-dir=C:/Users/Thales.Bartolomeu/AppData/Local/Google/Chrome/User Data/Profile 2')
+navegador = webdriver.Chrome('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Chromedriver/chromedriver.exe', chrome_options=options)
+navegador.get('chrome://extensions/')
+retorno = navegador.find_element_by_xpath('//*[@id="main"]').text
+print(retorno)
+
+
+
+navegador.get('https://www.mercadolivre.com.br/liquidificador-industrial-evitra-alta-rotaco-4-l-preto-e-prata-com-jarra-de-aco-inoxidavel-220v/p/MLB17353885/?MLB1940410616')
+retorno = navegador.find_element_by_xpath('//*[@id="root-app"]/div[2]/div[3]/div[1]/div[1]/div/div[1]/div[2]/div[1]/div[1]/div[1]/div/div/div').text
+
+print(retorno)
+
+
+
+pytrend = TrendReq()
+pytrend.build_payload(kw_list=['Liquidificador baixa rotação'])
+df = pytrend.interest_over_time()
+print(df.tail())
+'''
+
 lista_produtos = pd.read_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Scrap_MeLi/Itens_pesquisar/itens_pesquisar.xlsx')
-print(lista_produtos)
 qtde_produtos = lista_produtos['Produtos'].count()
 linha_produtos = 0
-produtos_resultado = pd.DataFrame(columns = (['Título','Valor à Vista','link']))
+produtos_resultado = pd.DataFrame(columns = (['Título','Valor à Vista','qtde_vendida','Stk disponível','Tipo Frete','seller','Vendas<60','Classe Seller','link']))
 
 qtde_categorias = lista_produtos['Categorias'].count()
 linha_categorias = 0
@@ -29,14 +60,65 @@ while linha_produtos < qtde_produtos:
     for produto in produtos:
         titulo = produto.find('h2',attrs={'class':'ui-search-item__title'})
         link = produto.find('a',attrs={'class':'ui-search-link'})
+        link1 = produto.find('a',attrs={'class':'ui-search-link'})['href']
+        link1 = requests.get(link1)
+        link1 = BeautifulSoup(link1.text,'html.parser')
+        stk_disponivel = link1.find('span',attrs={'class':'ui-pdp-buybox__quantity__available'})
+
+        if stk_disponivel == None:
+            stk_disponivel = 'Último disponível'
+        else:
+            stk_disponivel = stk_disponivel.text
+
+        stk_disponivel = str(stk_disponivel).replace('disponíveis','').replace('(','').replace(')','')
         valor_vista = produto.find('span',attrs={'class':'price-tag-fraction'})
-        #print('Título:', titulo.text)
-        #print('link: ', link['href'])
-        #print('Valor à vista: ', valor_vista.text)
-        produtos_resultado.loc[linha] = ([titulo.text,valor_vista.text,link['href']])
+        #qtde_vendida =  link1.find('div',attrs={'class':'ui-pdp-container__col col-2 ui-vip-core-container--short-description ui-vip-core-container--column__right'})
+        #qtde_vendida = qtde_vendida.find('div',attrs={'class':'ui-pdp-container__row ui-pdp-container__row--header'})
+        qtde_vendida = link1.find('div',attrs={'class':'ui-pdp-header'})
+        qtde_vendida = qtde_vendida.find('div',attrs={'class':'ui-pdp-header__subtitle'})
+        qtde_vendida = qtde_vendida.find('span',attrs={'class':'ui-pdp-subtitle'})
+        qtde_vendida = qtde_vendida.text
+        qtde_vendida = qtde_vendida.replace('Novo','').replace('vendidos','').replace('|','').lstrip().rstrip()
+
+        tipo_frete = link1.find('div',attrs={'class':'ui-pdp-media__body'})
+        tipo_frete = tipo_frete.text
+
+        if 'Frete' in tipo_frete:
+            tipo_frete = 'Frete grátis'
+
+        if 'Chegará grátis' in tipo_frete:
+            tipo_frete = 'Frete grátis'
+    
+        if 'Entrega a combinar' in tipo_frete:
+            tipo_frete = 'Entrega a combinar'
+        
+        if 'Envio para todo' in tipo_frete:
+            tipo_frete = 'Entrega a combinar'    
+
+        seller1 = link1.find('a',attrs={'class':'ui-pdp-media__action ui-box-component__action'})
+        vendedor_loja = link1.find('h2',attrs={'class':'ui-box-component__title'})
+        vendas_60_dias = link1.find('strong',attrs={'class':'ui-pdp-seller__sales-description'})
+        classe_seller = link1.find('p',attrs={'class':'ui-seller-info__status-info__title ui-pdp-seller__status-title'})
+
+        if classe_seller == None:
+            classe_seller = 'Sem informação'
+        else:
+            classe_seller = classe_seller.text
+
+        seller1 = requests.get(seller1['href'])
+        seller1 = BeautifulSoup(seller1.text,'html.parser')
+        if vendedor_loja.text == 'Informações da loja':
+            seller = seller1.find('h3',attrs={'class':'brand'})
+        else:
+            seller = seller1.find('h3',attrs={'class':'store-info__name'})
+
+        produtos_resultado.loc[linha] = ([titulo.text,valor_vista.text,qtde_vendida,stk_disponivel,tipo_frete,seller.text,vendas_60_dias.text,classe_seller,link['href']])
+        print(titulo.text,valor_vista,seller.text, tipo_frete)
         linha = linha + 1
 
 print('produtos',produtos_resultado)
+produtos_resultado.to_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Scrap_MeLi/mon_meli.xlsx')
+'''
 linha = 0
 while linha_categorias < qtde_categorias:
     categoria = lista_produtos.iloc[linha_categorias,1]
@@ -74,3 +156,4 @@ while linha_fornecedores < qtde_fornecedores:
         linha = linha + 1
 print('fornecedores',fornecedores_resultado)
 #planilha_produtos.to_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Scrap_MeLi/'+produto_pesquisa+'.xlsx')
+'''
