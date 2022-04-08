@@ -1,0 +1,48 @@
+from cmath import nan
+from operator import truediv
+import requests
+from bs4 import BeautifulSoup
+import numpy as np
+import pandas as pd
+from time import sleep
+from pytrends.request import TrendReq
+from collections import Counter
+import statistics
+
+
+lista_produtos = pd.read_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Monitoramento/Monitoramento_Google_Trends/Itens_pesquisar.xlsx')
+qtde_produtos = lista_produtos['Produtos'].count()
+resultado_monitoramento_google_trends = pd.DataFrame()
+linha = 0
+
+while linha < qtde_produtos:
+    kw_list = []
+    sku = lista_produtos.iloc[linha,0]
+    produto =  lista_produtos.iloc[linha,1]
+    termos = str(lista_produtos.iloc[linha,2])
+
+    if termos != 'nan':
+        print(termos)
+        kw_list = termos.split(',')
+        qtde_kw_list = len(kw_list)
+        pytrends = TrendReq(hl='pt-BR')
+        pytrends.build_payload(kw_list, timeframe='today 3-m', geo='BR',)
+        df_interesse_tempo = pytrends.interest_over_time()
+        principais_topicos = pytrends.related_queries()
+        interesse_regiao = pytrends.interest_by_region(resolution='City', inc_low_vol=True, inc_geo_code=False)
+        num_item = 0
+        tabela_sugestoes = pd.DataFrame
+
+        for item in kw_list:     
+            principais_topicos = pd.DataFrame(principais_topicos[kw_list[num_item]]['rising'])            
+            sugestoes = pytrends.suggestions(kw_list[num_item])
+            num_item = num_item + 1
+    
+   #interesse_regiao = interesse_regiao.drop(interesse_regiao.loc[interesse_regiao['refresqueira']==0].index,inplace=True)
+    print(sku, produto, termos)
+    print(df_interesse_tempo)
+    print(principais_topicos)
+    print(interesse_regiao)
+    print(sugestoes)
+    linha = linha + 1
+resultado_monitoramento_google_trends.to_excel('//192.168.1.16/02 - Público/09 - Marketing/Marketplaces/Monitoramento/Monitoramento_Google_Trends/Resultado_Monitoramento_Google_Trends.xlsx')
